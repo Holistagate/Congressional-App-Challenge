@@ -1,27 +1,47 @@
 /* ===========================================================================
-   The role chooser, and the rest of the landing page.
+   The role chooser.
 
-   The photograph sets two places at a table, and those two plates are the two
-   choices. Each carries a button that sits *on* the china rather than being
-   printed into it: solid fill, and a contact shadow underneath that grounds it
-   against the plate. That shadow is doing real work — it is what tells you the
-   button is an object you can press, on a surface, in a photograph — which is
-   why this is the one place in the product that uses one.
+   A full screen of table. The photograph sets two places, and those two plates
+   are the two choices — so the shot fills the viewport the way the shopfront
+   does above it, and the buttons sit on the china inside it.
 
-   Two layouts, because one composition cannot serve both shapes: a phone gets
-   each plate as its own crop, stacked; anything wider gets the whole table.
+   Each button carries a blurred ellipse cast onto the plate beneath it. That
+   shadow is doing real work: it is what tells you the button is an object
+   resting on a surface in a photograph rather than a label printed into it,
+   and it is why this is the one place in the product that uses one.
+
+   Two layouts, because one composition cannot serve both shapes. A wide screen
+   gets the whole table. A phone would crop that shot down to the bare wood
+   between the two settings, so it gets each plate as its own frame instead.
    =========================================================================== */
 
 .chooser {
   position: relative;
+  min-height: 100svh;
+  overflow: hidden;
   background: #0a0a0a;
-  padding: clamp(3rem, 7vw, 5rem) 0 clamp(3.5rem, 8vw, 6rem);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.75rem, 5vh, 3.5rem) 1rem clamp(1.5rem, 4vh, 3rem);
+}
+
+/* Keeps the heading legible over whatever part of the photograph ends up
+   behind it, without dimming the whole shot. */
+.chooser::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 42%;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.88), rgba(10, 10, 10, 0));
+  pointer-events: none;
 }
 
 .chooser-heading {
-  margin: 0 auto clamp(2rem, 4.5vw, 3rem);
+  position: relative;
+  z-index: 3;
+  margin: 0 auto clamp(1.5rem, 4vh, 2.5rem);
   max-width: 20ch;
-  padding: 0 1.25rem;
   text-align: center;
   color: #f7f5f0;
   font-family: var(--font-display);
@@ -32,12 +52,16 @@
   text-transform: uppercase;
 }
 
-/* ------------------------------------------------- phones: stacked crops - */
+/* --------------------------------------------- phones: stacked frames --- */
 
 .chooser-table {
+  position: relative;
+  z-index: 3;
+  flex: 1;
   display: grid;
-  gap: 1.25rem;
-  padding: 0 1rem;
+  grid-auto-rows: 1fr;
+  gap: 0.875rem;
+  width: 100%;
   max-width: 34rem;
   margin: 0 auto;
 }
@@ -47,8 +71,8 @@
   display: grid;
   align-content: center;
   justify-items: center;
-  min-height: 16rem;
-  padding: 1.75rem 1.25rem 4.5rem;
+  min-height: 12rem;
+  padding: 1.5rem 1.25rem 4.25rem;
   border-radius: 4px;
   overflow: hidden;
   text-decoration: none;
@@ -66,10 +90,7 @@
   background-image: url(/media/plate-provider.webp);
 }
 
-/*
-  The button. Floated off the plate: a solid pine fill, a hard-edged pill, and
-  a shadow cast down onto the china below it.
-*/
+/* The button, floated off the plate. */
 .plate-btn {
   position: relative;
   z-index: 2;
@@ -97,6 +118,9 @@
     background-color 0.18s ease;
 }
 
+/* The shadow the button casts down onto the china. A separate blurred ellipse
+   rather than more box-shadow, because a cast shadow lands on the plate below
+   the button and spreads — it is not a halo around the button's own edge. */
 .plate-btn::after {
   content: "";
   position: absolute;
@@ -113,12 +137,12 @@
     opacity 0.18s ease;
 }
 
-/* The supporting line sits on the wood, below the plate, so it never crowds
-   the button or competes with it for the china. */
+/* The supporting line sits on the wood at the foot of the frame: white text on
+   white china is a poor bet however much shadow it carries. */
 .plate-sub {
   position: absolute;
   left: 50%;
-  bottom: 1.25rem;
+  bottom: 1.125rem;
   translate: -50% 0;
   z-index: 2;
   max-width: 26ch;
@@ -131,7 +155,8 @@
     0 2px 14px rgba(0, 0, 0, 0.8);
 }
 
-/* Lifts further off the plate on hover, and the shadow spreads to match. */
+/* Lifts further off the plate, and the cast shadow drops away and softens the
+   way a real one would. */
 .plate:hover .plate-btn,
 .plate:focus-visible .plate-btn {
   transform: translateY(-4px);
@@ -148,11 +173,6 @@
   opacity: 0.72;
 }
 
-.plate:active .plate-btn::after {
-  transform: translateY(0) scaleX(0.94);
-  opacity: 1;
-}
-
 .plate:active .plate-btn {
   transform: translateY(-1px);
   box-shadow:
@@ -160,33 +180,62 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+.plate:active .plate-btn::after {
+  transform: translateY(0) scaleX(0.94);
+  opacity: 1;
+}
+
 .plate:focus-visible {
   outline: 3px solid #f7f5f0;
   outline-offset: 3px;
 }
 
-/* ------------------------------------- tablet and up: the whole table ---- */
+/* ------------------------------ tablet and up: the table fills the screen - */
 
 @media (min-width: 48rem) {
-  .chooser-table {
-    position: relative;
+  .chooser {
     display: block;
-    max-width: none;
     padding: 0;
-    /* The photograph's own ratio, so the plate coordinates below stay true. */
-    aspect-ratio: 1537 / 1023;
-    max-height: 76svh;
-    margin-inline: auto;
-    width: min(100%, calc(76svh * 1537 / 1023));
-    background: url(/media/plates-1600.webp) center / cover no-repeat;
+  }
+
+  /*
+    The photograph, grown until it covers the viewport and centred — the same
+    technique the shopfront uses above. Fixing the box to the shot's own aspect
+    ratio is what lets the two plate positions below stay percentages taken
+    straight off the source image: the picture can fill any screen and the
+    buttons stay on the china.
+  */
+  .chooser-table {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    display: block;
+    width: max(100vw, calc(100svh * 1537 / 1023));
+    height: max(100svh, calc(100vw * 1023 / 1537));
+    max-width: none;
+    margin: 0;
+    background: url(/media/plates-1600.webp) center / 100% 100% no-repeat;
+  }
+
+  .chooser-heading {
+    position: absolute;
+    z-index: 3;
+    top: clamp(2rem, 7vh, 5rem);
+    left: 50%;
+    translate: -50% 0;
+    margin: 0;
+    width: max-content;
+    max-width: min(20ch, 90vw);
   }
 
   /* Centres measured off design/source/plates.png. */
   .plate {
     position: absolute;
+    z-index: 2;
     min-height: 0;
     padding: 0;
-    gap: 0.875rem;
     border-radius: 999px;
     background-image: none;
     background-color: transparent;
@@ -213,13 +262,11 @@
     white-space: nowrap;
   }
 
-  /* On the wide shot the supporting line has the wood below the plate to sit
-     on, so it hangs just outside the circle rather than inside it. */
+  /* On the wide shot there is wood below each plate for the line to sit on,
+     so it hangs just outside the circle rather than inside it. */
   .plate-sub {
-    position: absolute;
     top: calc(100% + 0.5rem);
-    left: 50%;
-    translate: -50% 0;
+    bottom: auto;
     width: 24ch;
     max-width: 90vw;
     font-size: clamp(0.8125rem, 1.05vw, 0.9375rem);
