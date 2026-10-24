@@ -1,0 +1,248 @@
+/* ===========================================================================
+   The role chooser, and the rest of the landing page.
+
+   The photograph sets two places at a table. Those two plates are the two
+   choices, so the targets sit on the plates themselves rather than becoming a
+   pair of buttons underneath a decorative image.
+
+   Two layouts, because one composition cannot serve both shapes: a phone gets
+   each plate as its own crop, stacked; anything wider gets the whole table
+   with a target on each setting.
+   =========================================================================== */
+
+.chooser {
+  position: relative;
+  background: #15110d;
+  padding: clamp(2.5rem, 6vw, 4.5rem) 0 clamp(3rem, 7vw, 5rem);
+}
+
+.chooser-heading {
+  margin: 0 auto clamp(1.75rem, 4vw, 2.75rem);
+  max-width: 22ch;
+  padding: 0 1.25rem;
+  text-align: center;
+  color: #f6f2ea;
+  font-size: clamp(1.5rem, 4.5vw, 2.25rem);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------- phones: stacked crops - */
+
+.chooser-table {
+  display: grid;
+  gap: 1rem;
+  padding: 0 1rem;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 13.5rem;
+  padding: 1.5rem;
+  border-radius: 4px;
+  overflow: hidden;
+  text-decoration: none;
+  background-color: #241a12;
+  background-size: cover;
+  background-position: center;
+  isolation: isolate;
+}
+
+.plate-seeker {
+  background-image: url(/media/plate-seeker.webp);
+}
+
+.plate-provider {
+  background-image: url(/media/plate-provider.webp);
+}
+
+/*
+  The label sits on the plate. White china under deep green type is already a
+  high-contrast pairing; the wash only steadies it against the parts of the
+  photograph that are wood.
+*/
+.plate-face {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.375rem;
+  place-items: center;
+  text-align: center;
+  padding: 1.25rem 1.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(2px);
+  max-width: 22rem;
+}
+
+.plate-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 4.5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--color-pine);
+}
+
+.plate-sub {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--color-ink);
+  max-width: 26ch;
+}
+
+.plate:hover .plate-face {
+  background: #fff;
+}
+
+.plate:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ------------------------------------- tablet and up: the whole table ---- */
+
+@media (min-width: 48rem) {
+  .chooser-table {
+    position: relative;
+    display: block;
+    max-width: none;
+    padding: 0;
+    /* The photograph's own ratio, so the plate coordinates below stay true. */
+    aspect-ratio: 1537 / 1023;
+    max-height: 78svh;
+    margin-inline: auto;
+    width: min(100%, calc(78svh * 1537 / 1023));
+    background: url(/media/plates-1600.webp) center / cover no-repeat;
+  }
+
+  /* Centres measured off design/source/plates.png. */
+  .plate {
+    position: absolute;
+    min-height: 0;
+    padding: 0;
+    border-radius: 999px;
+    background-image: none;
+    background-color: transparent;
+    width: 31%;
+    aspect-ratio: 1;
+    translate: -50% -50%;
+  }
+
+  .plate-seeker {
+    left: 28.6%;
+    top: 47.6%;
+  }
+
+  .plate-provider {
+    left: 69.3%;
+    top: 47%;
+  }
+
+  .plate-face {
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0 12%;
+    gap: 0.5rem;
+  }
+
+  .plate-title {
+    font-size: clamp(1.1rem, 2.2vw, 1.9rem);
+  }
+
+  .plate-sub {
+    font-size: clamp(0.75rem, 1.05vw, 0.9375rem);
+    color: #2c4536;
+  }
+
+  /* Hovering lifts the china a little out of the dark room. */
+  .plate::before {
+    content: "";
+    position: absolute;
+    inset: -2%;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .plate:hover::before,
+  .plate:focus-visible::before {
+    opacity: 1;
+  }
+}
+
+/* ============================================================== explainer */
+
+.explainer {
+  background: var(--color-paper);
+  padding: clamp(3rem, 8vw, 5.5rem) 1.25rem;
+}
+
+.explainer-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.explainer h2 {
+  margin: 0 0 2rem;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+/* A real sequence, so it is numbered. The counter sits in the margin as a
+   slab-set figure rather than a filled circle: it is a step number, not a
+   badge. */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  display: grid;
+  gap: 2rem;
+}
+
+.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0 1rem;
+  align-items: baseline;
+}
+
+.steps li::before {
+  content: counter(step);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--color-leaf);
+  line-height: 1;
+  grid-row: 1 / span 2;
+}
+
+.steps h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1.1875rem;
+}
+
+.steps p {
+  margin: 0;
+  color: var(--color-muted);
+  max-width: 54ch;
+  line-height: 1.6;
+}
+
+.explainer-note {
+  margin: 2.5rem 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-edge);
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  max-width: 60ch;
+}
+
+.explainer-note a {
+  color: var(--color-pine);
+  text-underline-offset: 2px;
+}

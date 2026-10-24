@@ -1,9 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Cache Components is deliberately off. Almost every route here is
+  // request-scoped (a session, a live listing list, a countdown), so there is
+  // very little worth prerendering, and turning it on would mean wrapping every
+  // route in Suspense plus `use cache: private` for session reads. See
+  // node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md
+  // if you ever want to adopt it; README "Assumptions" explains the tradeoff.
+  cacheComponents: false,
+  partialPrefetching: false,
+
   turbopack: {
     rules: {
       "*.css": {
@@ -11,6 +17,37 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+
+  images: {
+    // Everything we serve is local and already sized by scripts/build-assets.mjs.
+    formats: ["image/webp"],
+  },
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Permissions-Policy",
+            // We promise seekers we never ask for location. Enforce it at the
+            // header so a future dependency cannot quietly start asking.
+            value: "geolocation=(), camera=(), microphone=(), interest-cohort=()",
+          },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
   },
 };
 

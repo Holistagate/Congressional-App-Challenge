@@ -1,0 +1,361 @@
+/* ===========================================================================
+   The opening film.
+
+   Every layer below reads the same `--p` (0 at the top of the track, 1 at the
+   bottom) and derives its own opacity and transform from it. No JS touches any
+   of these properties directly.
+
+   The cue sheet, in --p:
+     0.00 .. 0.14   Act I holds: camera pushing into a dark shopfront
+     0.14 .. 0.24   "The world starves" lifts away
+     0.22 .. 0.34   to black
+     0.36 .. 0.64   "We have a solution"
+     0.62 .. 0.78   the shop resolves, lit
+     0.74 .. 0.96   the sign lights and the door swings open
+   =========================================================================== */
+
+.opening-track {
+  position: relative;
+  height: 420vh;
+  background: #000;
+}
+
+.opening-stage {
+  --p: 0;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  background: #000;
+  display: grid;
+  place-items: center;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* --------------------------------------------------- Act I: the film ----- */
+
+.layer-film {
+  /* Gone by 0.40. The push continues under the blackout so the cut to Act II
+     lands mid-movement rather than on a frozen frame. */
+  opacity: clamp(0, calc((0.4 - var(--p)) / 0.1), 1);
+  transform: scale(calc(1 + var(--p) * 0.35));
+}
+
+.film {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-size: cover;
+  background-position: center;
+}
+
+/* The shot has a white sign board across the top, so the headline sits in the
+   lower third and the scrim is weighted to match: light touch up top where the
+   frame is already dark, heavy at the bottom where the words are. */
+.film-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(0, 0, 0, 0.18) 30%,
+    rgba(0, 0, 0, 0.62) 68%,
+    rgba(0, 0, 0, 0.9) 100%
+  );
+}
+
+/* ------------------------------------------------------------ headlines -- */
+
+.line {
+  position: relative;
+  z-index: 3;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  color: #fff;
+  text-wrap: balance;
+}
+
+/*
+  Lower third, left aligned — the documentary title card. It keeps the words
+  off the shop's white sign board, and it is where the frame is darkest.
+*/
+.line-1 {
+  position: absolute;
+  left: clamp(1.25rem, 5vw, 4.5rem);
+  right: clamp(1.25rem, 5vw, 4.5rem);
+  bottom: clamp(5rem, 14vh, 9rem);
+  max-width: 13ch;
+  text-align: left;
+  font-size: clamp(2.5rem, 10.5vw, 7rem);
+  opacity: clamp(0, calc((0.24 - var(--p)) / 0.1), 1);
+  transform: translateY(calc(var(--p) * -50px));
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Act II is a title card on black, so this one is centred. */
+.line-2 {
+  padding: 0 1.25rem;
+  max-width: 16ch;
+  text-align: center;
+  font-size: clamp(2rem, 8.5vw, 5rem);
+  color: #f4fbf2;
+  /* Fades up out of the black, holds, then clears before the shop appears. */
+  opacity: min(
+    clamp(0, calc((var(--p) - 0.36) / 0.1), 1),
+    clamp(0, calc((0.68 - var(--p)) / 0.08), 1)
+  );
+  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.36) / 0.12), 1)) * 24px));
+}
+
+/* ------------------------------------------------- Act II: the blackout -- */
+
+.layer-black {
+  z-index: 2;
+  background: #000;
+  opacity: clamp(0, calc((var(--p) - 0.22) / 0.12), 1);
+}
+
+/* --------------------------------------------- Act III: the lit shopfront */
+
+.layer-shop {
+  z-index: 2;
+  opacity: clamp(0, calc((var(--p) - 0.62) / 0.16), 1);
+}
+
+/*
+  A box with the photograph's own aspect ratio, grown until it covers the
+  viewport. Fixing the ratio is what lets the door, the doorway light and the
+  sign be positioned in percentages taken straight off the source image.
+*/
+.scene {
+  /* Absolutely centred rather than grid-centred: a grid item wider than its
+     track aligns to the start to avoid clipping, which would hang the shot off
+     the left edge on any viewport narrower than the photo. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, calc(100svh * 1328 / 744));
+  height: max(100svh, calc(100vw * 744 / 1328));
+  /* Settles out of the push rather than snapping to rest. */
+  transform: translate(-50%, -50%)
+    scale(calc(1.12 - clamp(0, calc((var(--p) - 0.62) / 0.26), 1) * 0.12));
+}
+
+.scene-photo {
+  position: absolute;
+  inset: 0;
+  background-image: url(/media/storefront-1600.webp);
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+/*
+  The room behind the door.
+
+  Built as an interior rather than a glowing panel: the ceiling stays in
+  shadow, the light pools low where a floor would catch it, and the left jamb
+  takes a soft shadow. Without that it reads as a gold rectangle taped over the
+  photograph.
+*/
+.doorway {
+  position: absolute;
+  left: 44.43%;
+  top: 37.63%;
+  width: 11.3%;
+  height: 45.7%;
+  background:
+    linear-gradient(90deg, rgba(40, 24, 6, 0.55) 0%, rgba(40, 24, 6, 0) 22%),
+    linear-gradient(
+      180deg,
+      rgba(26, 16, 5, 0.95) 0%,
+      rgba(96, 60, 16, 0.5) 16%,
+      rgba(243, 203, 128, 0.82) 54%,
+      rgba(255, 226, 168, 0.95) 82%,
+      rgba(214, 170, 104, 0.88) 100%
+    ),
+    #2a1c0a;
+  opacity: clamp(0, calc((var(--p) - 0.74) / 0.14), 1);
+}
+
+/*
+  Light falling out onto the wet pavement. This is what makes the shop read as
+  open rather than lit from within — and the pavement in the shot is already
+  reflective, so it is doing what the photograph would do.
+*/
+.door-spill {
+  position: absolute;
+  left: 40%;
+  top: 80%;
+  width: 20%;
+  height: 16%;
+  /* A plain translucent gradient, not mix-blend-mode. Blending would promote
+     this to its own composited layer over a playing video, which is exactly
+     the kind of cost the low-end phones this app targets cannot absorb. */
+  background: radial-gradient(
+    60% 50% at 50% 20%,
+    rgba(255, 221, 156, 0.5),
+    rgba(255, 208, 132, 0.18) 55%,
+    rgba(255, 200, 120, 0) 100%
+  );
+  opacity: clamp(0, calc((var(--p) - 0.78) / 0.16), 1);
+}
+
+/* The door itself: a slice of the same photograph, hinged on its right stile
+   (the handle in the shot is on the left, so that is where the hinges are). */
+.door {
+  position: absolute;
+  left: 44.43%;
+  top: 37.63%;
+  width: 11.3%;
+  height: 45.7%;
+  background-image: url(/media/storefront-1600.webp);
+  background-repeat: no-repeat;
+  transform-origin: right center;
+  transform: perspective(1400px)
+    rotateY(calc(clamp(0, calc((var(--p) - 0.74) / 0.22), 1) * 74deg));
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+}
+
+/* The blank sign board in the photograph is where our name goes. */
+.sign {
+  position: absolute;
+  left: 13.93%;
+  top: 15.86%;
+  width: 69.65%;
+  height: 15.73%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 1.4vw, 1.5rem);
+  opacity: clamp(0, calc((var(--p) - 0.78) / 0.14), 1);
+}
+
+.sign-mark {
+  height: 72%;
+  width: auto;
+}
+
+.sign-word {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1rem, 4.4vw, 4rem);
+  letter-spacing: -0.02em;
+  color: #14532a;
+  line-height: 1;
+}
+
+/* ----------------------------------------------------------- scroll cue -- */
+
+.scroll-cue {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: clamp(0, calc((0.08 - var(--p)) / 0.05), 1);
+}
+
+.scroll-cue svg {
+  animation: cue-drift 2.4s ease-in-out infinite;
+}
+
+@keyframes cue-drift {
+  0%,
+  100% {
+    transform: translateY(-3px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(3px);
+    opacity: 1;
+  }
+}
+
+/* ===========================================================================
+   Reduced motion, and anyone whose browser cannot do the above.
+
+   The three acts become three ordinary panels you scroll past. Same content,
+   same order, same words — just nothing that moves on its own.
+   =========================================================================== */
+
+.opening-track[data-still="true"] {
+  height: auto;
+}
+
+.opening-track[data-still="true"] .opening-stage {
+  position: static;
+  height: auto;
+  display: block;
+}
+
+.opening-track[data-still="true"] .layer,
+.opening-track[data-still="true"] .line {
+  position: relative;
+  inset: auto;
+  opacity: 1;
+  transform: none;
+  min-height: 62svh;
+}
+
+.opening-track[data-still="true"] .layer-black {
+  display: none;
+}
+
+.opening-track[data-still="true"] .line {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 2.5rem 1.25rem;
+  max-width: none;
+}
+
+.opening-track[data-still="true"] .line-1 {
+  margin-top: -32svh;
+}
+
+.opening-track[data-still="true"] .line-2 {
+  background: #000;
+  padding: 4rem 1.25rem;
+}
+
+.opening-track[data-still="true"] .scene {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1328 / 744;
+  transform: none;
+}
+
+.opening-track[data-still="true"] .doorway,
+.opening-track[data-still="true"] .sign {
+  opacity: 1;
+}
+
+.opening-track[data-still="true"] .door {
+  transform: perspective(1400px) rotateY(74deg);
+}
+
+.opening-track[data-still="true"] .scroll-cue {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue svg {
+    animation: none;
+  }
+}
