@@ -1,36 +1,42 @@
 /* ===========================================================================
    The role chooser, and the rest of the landing page.
 
-   The photograph sets two places at a table. Those two plates are the two
-   choices, so the targets sit on the plates themselves rather than becoming a
-   pair of buttons underneath a decorative image.
+   The photograph sets two places at a table, and those two plates are the two
+   choices. Each carries a button that sits *on* the china rather than being
+   printed into it: solid fill, and a contact shadow underneath that grounds it
+   against the plate. That shadow is doing real work — it is what tells you the
+   button is an object you can press, on a surface, in a photograph — which is
+   why this is the one place in the product that uses one.
 
    Two layouts, because one composition cannot serve both shapes: a phone gets
-   each plate as its own crop, stacked; anything wider gets the whole table
-   with a target on each setting.
+   each plate as its own crop, stacked; anything wider gets the whole table.
    =========================================================================== */
 
 .chooser {
   position: relative;
-  background: #15110d;
-  padding: clamp(2.5rem, 6vw, 4.5rem) 0 clamp(3rem, 7vw, 5rem);
+  background: #0a0a0a;
+  padding: clamp(3rem, 7vw, 5rem) 0 clamp(3.5rem, 8vw, 6rem);
 }
 
 .chooser-heading {
-  margin: 0 auto clamp(1.75rem, 4vw, 2.75rem);
-  max-width: 22ch;
+  margin: 0 auto clamp(2rem, 4.5vw, 3rem);
+  max-width: 20ch;
   padding: 0 1.25rem;
   text-align: center;
-  color: #f6f2ea;
-  font-size: clamp(1.5rem, 4.5vw, 2.25rem);
-  font-weight: 500;
+  color: #f7f5f0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.75rem, 5.5vw, 3rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
 /* ------------------------------------------------- phones: stacked crops - */
 
 .chooser-table {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
   padding: 0 1rem;
   max-width: 34rem;
   margin: 0 auto;
@@ -39,9 +45,10 @@
 .plate {
   position: relative;
   display: grid;
-  place-items: center;
-  min-height: 13.5rem;
-  padding: 1.5rem;
+  align-content: center;
+  justify-items: center;
+  min-height: 16rem;
+  padding: 1.75rem 1.25rem 4.5rem;
   border-radius: 4px;
   overflow: hidden;
   text-decoration: none;
@@ -60,45 +67,101 @@
 }
 
 /*
-  The label sits on the plate. White china under deep green type is already a
-  high-contrast pairing; the wash only steadies it against the parts of the
-  photograph that are wood.
+  The button. Floated off the plate: a solid pine fill, a hard-edged pill, and
+  a shadow cast down onto the china below it.
 */
-.plate-face {
+.plate-btn {
   position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 0.375rem;
-  place-items: center;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.875rem 1.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-pine);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(1rem, 3.6vw, 1.1875rem);
+  line-height: 1.15;
   text-align: center;
-  padding: 1.25rem 1.5rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(2px);
-  max-width: 22rem;
+  letter-spacing: -0.005em;
+  box-shadow:
+    0 14px 22px -10px rgba(0, 0, 0, 0.7),
+    0 3px 8px -2px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
 }
 
-.plate-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.25rem, 4.5vw, 1.75rem);
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--color-pine);
+.plate-btn::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 6%;
+  right: 6%;
+  bottom: -0.9rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: rgba(22, 16, 8, 0.5);
+  filter: blur(10px);
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
 }
 
+/* The supporting line sits on the wood, below the plate, so it never crowds
+   the button or competes with it for the china. */
 .plate-sub {
+  position: absolute;
+  left: 50%;
+  bottom: 1.25rem;
+  translate: -50% 0;
+  z-index: 2;
+  max-width: 26ch;
+  text-align: center;
   font-size: 0.9375rem;
   line-height: 1.45;
-  color: var(--color-ink);
-  max-width: 26ch;
+  color: #f7f5f0;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.9),
+    0 2px 14px rgba(0, 0, 0, 0.8);
 }
 
-.plate:hover .plate-face {
-  background: #fff;
+/* Lifts further off the plate on hover, and the shadow spreads to match. */
+.plate:hover .plate-btn,
+.plate:focus-visible .plate-btn {
+  transform: translateY(-4px);
+  background: #18602f;
+  box-shadow:
+    0 22px 32px -12px rgba(0, 0, 0, 0.72),
+    0 6px 14px -2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.plate:hover .plate-btn::after,
+.plate:focus-visible .plate-btn::after {
+  transform: translateY(5px) scaleX(1.08);
+  opacity: 0.72;
+}
+
+.plate:active .plate-btn::after {
+  transform: translateY(0) scaleX(0.94);
+  opacity: 1;
+}
+
+.plate:active .plate-btn {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 18px -8px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .plate:focus-visible {
-  outline: 3px solid #fff;
+  outline: 3px solid #f7f5f0;
   outline-offset: 3px;
 }
 
@@ -112,9 +175,9 @@
     padding: 0;
     /* The photograph's own ratio, so the plate coordinates below stay true. */
     aspect-ratio: 1537 / 1023;
-    max-height: 78svh;
+    max-height: 76svh;
     margin-inline: auto;
-    width: min(100%, calc(78svh * 1537 / 1023));
+    width: min(100%, calc(76svh * 1537 / 1023));
     background: url(/media/plates-1600.webp) center / cover no-repeat;
   }
 
@@ -123,12 +186,14 @@
     position: absolute;
     min-height: 0;
     padding: 0;
+    gap: 0.875rem;
     border-radius: 999px;
     background-image: none;
     background-color: transparent;
     width: 31%;
     aspect-ratio: 1;
     translate: -50% -50%;
+    overflow: visible;
   }
 
   .plate-seeker {
@@ -141,36 +206,23 @@
     top: 47%;
   }
 
-  .plate-face {
-    background: transparent;
-    backdrop-filter: none;
-    padding: 0 12%;
-    gap: 0.5rem;
+  .plate-btn {
+    min-height: 3rem;
+    padding: 0.8125rem clamp(1rem, 2.2vw, 2rem);
+    font-size: clamp(0.9375rem, 1.5vw, 1.25rem);
+    white-space: nowrap;
   }
 
-  .plate-title {
-    font-size: clamp(1.1rem, 2.2vw, 1.9rem);
-  }
-
+  /* On the wide shot the supporting line has the wood below the plate to sit
+     on, so it hangs just outside the circle rather than inside it. */
   .plate-sub {
-    font-size: clamp(0.75rem, 1.05vw, 0.9375rem);
-    color: #2c4536;
-  }
-
-  /* Hovering lifts the china a little out of the dark room. */
-  .plate::before {
-    content: "";
     position: absolute;
-    inset: -2%;
-    border-radius: 999px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-  }
-
-  .plate:hover::before,
-  .plate:focus-visible::before {
-    opacity: 1;
+    top: calc(100% + 0.5rem);
+    left: 50%;
+    translate: -50% 0;
+    width: 24ch;
+    max-width: 90vw;
+    font-size: clamp(0.8125rem, 1.05vw, 0.9375rem);
   }
 }
 

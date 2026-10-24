@@ -39,6 +39,7 @@ const en = {
   "nav.language": "Language",
 
   /* landing */
+  "landing.eyebrow": "Tonight, somewhere near you",
   "landing.act1": "The world starves",
   "landing.act2": "We have a solution",
   "landing.scroll": "Scroll",
@@ -211,6 +212,7 @@ const es: Record<Key, string> = {
   "nav.skip": "Saltar al contenido principal",
   "nav.language": "Idioma",
 
+  "landing.eyebrow": "Esta noche, cerca de ti",
   "landing.act1": "El mundo pasa hambre",
   "landing.act2": "Tenemos una solución",
   "landing.scroll": "Desplázate",

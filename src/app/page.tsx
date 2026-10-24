@@ -20,6 +20,7 @@ export default async function LandingPage() {
   return (
     <>
       <Opening
+        eyebrow={t("landing.eyebrow")}
         act1={t("landing.act1")}
         act2={t("landing.act2")}
         scrollLabel={t("landing.scroll")}
@@ -34,19 +35,19 @@ export default async function LandingPage() {
             {t("landing.choose")}
           </h2>
 
+          {/* The two plates in the photograph are the two choices. The button
+              on each one is lifted off the china with a contact shadow, so it
+              reads as an object resting on the plate rather than a label
+              printed on it. */}
           <div className="chooser-table">
             <Link href="/food" className="plate plate-seeker">
-              <span className="plate-face">
-                <span className="plate-title">{t("landing.seeker")}</span>
-                <span className="plate-sub">{t("landing.seekerSub")}</span>
-              </span>
+              <span className="plate-btn">{t("landing.seeker")}</span>
+              <span className="plate-sub">{t("landing.seekerSub")}</span>
             </Link>
 
             <Link href="/signup?role=provider" className="plate plate-provider">
-              <span className="plate-face">
-                <span className="plate-title">{t("landing.provider")}</span>
-                <span className="plate-sub">{t("landing.providerSub")}</span>
-              </span>
+              <span className="plate-btn">{t("landing.provider")}</span>
+              <span className="plate-sub">{t("landing.providerSub")}</span>
             </Link>
           </div>
         </section>

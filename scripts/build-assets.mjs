@@ -116,14 +116,6 @@ for (const w of [1600, 900]) {
     .toFile(out("media", `storefront-${w}.webp`));
 }
 
-// Poster frame for the opening video, so the first paint is an image and not
-// a black box while the mp4 buffers (or never loads at all).
-await sharp(src("storefront.png"))
-  .resize(900)
-  .modulate({ brightness: 0.34 })
-  .blur(2)
-  .webp({ quality: 58 })
-  .toFile(out("media", "opening-poster.webp"));
 
 /* ------------------------------------------------------------ manifest ---- */
 const report = [];
@@ -134,8 +126,6 @@ for (const f of [
   "media/plate-seeker.webp",
   "media/plate-provider.webp",
   "media/storefront-1600.webp",
-  "media/opening-poster.webp",
-  "media/opening.mp4",
 ]) {
   if (await exists(out(f))) {
     const { size } = await sharp(out(f))
