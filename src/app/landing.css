@@ -7,8 +7,23 @@
    =========================================================================== */
 
 .explainer {
+  position: relative;
   background: var(--color-paper);
   padding: clamp(3.5rem, 9vw, 6rem) 1.25rem;
+}
+
+/* Carries the chooser's sage the last short distance into white. The page has
+   been one continuous surface since the opening — dark street, dark room, then
+   the lights up on the table — and a hard line to paper here is the only place
+   that reads as two documents stitched together. Short enough that the section
+   break survives. */
+.explainer::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: clamp(3rem, 7vw, 5.5rem);
+  pointer-events: none;
+  background: linear-gradient(180deg, #d2e2cd 0%, rgba(210, 226, 205, 0) 100%);
 }
 
 .explainer-inner {
