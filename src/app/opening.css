@@ -222,9 +222,11 @@
   max-width: 16ch;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(2.75rem, 11.5vw, 8.5rem);
-  line-height: 0.86;
-  letter-spacing: -0.025em;
+  font-size: clamp(2.5rem, 10.5vw, 7.75rem);
+  /* Looser than the slab setting this replaces. Montserrat's capitals are
+     wide and round; crushed to 0.86 and tracked in hard they collide. */
+  line-height: 0.98;
+  letter-spacing: -0.012em;
   text-transform: uppercase;
   /* Warm off-white, never pure white: pure white reads as a UI element
      dropped on top of the page rather than part of it. */

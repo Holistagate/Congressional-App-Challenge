@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Zilla_Slab, Public_Sans, Montserrat } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { currentUser } from "@/lib/session";
 import { translator } from "@/lib/i18n";
@@ -7,43 +7,22 @@ import { getLang } from "@/lib/i18n-server";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
 /**
- * Zilla Slab carries the voice: blunt slab terminals that read like menu-board
- * and produce-crate lettering rather than a tech product.
+ * One typeface, everywhere.
  *
- * Public Sans does the work. It is the typeface of the US Web Design System —
- * for a civic app about the food safety net that is a motivated choice, not a
- * default — and it has the tabular figures every countdown in here depends on.
- */
-const zilla = Zilla_Slab({
-  variable: "--font-zilla",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const publicSans = Public_Sans({
-  variable: "--font-public",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-/**
- * Montserrat is the role chooser's voice, and only the chooser's.
+ * The page used to run three: a slab for the opening, a civic grotesque for
+ * the app, and Montserrat for the role chooser. Three voices in one product
+ * is two too many, and the chooser's was the one that fit — geometric, calm,
+ * legible small, and the right register for a page about food.
  *
- * That screen wants the calm, airy, geometric treatment of a Japanese food
- * brand — regular and medium weights, letters tracked apart rather than
- * jammed together, lines given room to breathe — which is the exact opposite
- * of the heavy, crushed slab the opening sequence is set in. A single family
- * cannot do both, so the chooser gets its own.
- *
- * Montserrat because the reference is set in Gotham: both are geometric sans
- * with a double-storey 'a' and a tall x-height, and Montserrat is the closest
- * of the freely licensed faces.
+ * Weight and tracking do the work instead of family. The opening sets it
+ * large and tight for drama; the chooser tracks it apart to stay calm; the
+ * app runs it plain at 400 and 600. 500 is loaded for the display sizes,
+ * where 600 is too dense and 400 too thin.
  */
 const montserrat = Montserrat({
   variable: "--font-montserrat",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -80,7 +59,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const t = translator(lang);
 
   return (
-    <html lang={lang} className={`${zilla.variable} ${publicSans.variable} ${montserrat.variable} h-full`}>
+    <html lang={lang} className={`${montserrat.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <a href="#main" className="skip-link">
           {t("nav.skip")}
