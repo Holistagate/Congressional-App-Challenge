@@ -31,12 +31,11 @@
   --color-stop: #a3231b; /* gone / report / destructive                (7.5:1) */
 
   /* --- type ------------------------------------------------------------- */
-  /* One family throughout — see layout.tsx. The three names are kept because
-     they say what the type is doing, not which font it is: display for
-     headings, sans for everything else, geo for the chooser's tracked
-     setting. They differ by weight and tracking, never by family. */
-  --font-display: var(--font-montserrat), "Helvetica Neue", Arial, sans-serif;
-  --font-sans: var(--font-montserrat), "Helvetica Neue", Arial, sans-serif;
+  /* Zilla Slab: blunt slab terminals, reads like menu-board lettering.
+     Public Sans: the US Web Design System face. A civic app for a civic
+     problem, and it has the tabular figures every countdown here depends on. */
+  --font-display: var(--font-zilla), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-public), system-ui, -apple-system, sans-serif;
 
   /* --- radius hierarchy -------------------------------------------------- */
   /* Deliberately not one radius on everything. Each value means something:
@@ -68,12 +67,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* The fork is the pointer across the whole product, not just the landing
-   page. Hotspot at the tines, and `default` behind it for any browser that
-   refuses the image — a cursor is never the only thing telling you what is
-   clickable, so nothing is lost where it does not load. */
 body {
-  cursor: url(/media/fork-cursor.png) 22 2, default;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
@@ -91,8 +85,8 @@ h3,
 h4 {
   font-family: var(--font-display);
   font-weight: 600;
-  line-height: 1.18;
-  letter-spacing: -0.008em;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
@@ -708,24 +702,4 @@ h3 {
    its left as a full-height gauge. Give the text room so the two don't touch. */
 .clock-detail {
   padding-left: 1rem;
-}
-
-/* Interactive things still say so, and text fields still get a caret: a fork
-   hovering over an address you are trying to select helps nobody. */
-a,
-button,
-summary,
-label,
-select,
-[role="button"] {
-  cursor: url(/media/fork-cursor.png) 22 2, pointer;
-}
-
-input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
-textarea {
-  cursor: text;
-}
-
-:disabled {
-  cursor: not-allowed;
 }

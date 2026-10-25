@@ -76,16 +76,26 @@ for (const size of [512, 192]) {
 /* ---------------------------------------------------------- storefront ---
  * The whole opening, and the only time this shot is used.
  *
- * Kept at the source's own 1632px and barely touched: unlike the shot it
- * replaces, this one is already bright, warm and saturated, and its sage
- * facade is the same green the role chooser's field is painted in — the
- * landing page now opens and closes on one colour. All it gets is a little
- * contrast and a light sharpen to survive the push-in.
+ * Graded warm and bright rather than left as shot: the original is a flat,
+ * grey, overcast frame, and the sequence opens on a shop that should look like
+ * somewhere you would want to walk into. Done here in the pipeline rather than
+ * with a CSS filter, because filtering a viewport-sized image forces a full
+ * repaint on every frame of the scroll — which is exactly the cost the phones
+ * this product targets cannot absorb.
+ *
+ * Kept at the source's own 1328px rather than upscaled. The sequence pushes
+ * in past 1.5x, which does soften it — but the push ends in a fade to black,
+ * so the softest frame is also the one nobody sees. Upscaling first would add
+ * weight without adding detail.
  */
-await sharp(src("storefront-sage.webp"))
-  .linear(1.04, -4)
-  .sharpen({ sigma: 0.5 })
-  .webp({ quality: 84 })
+await sharp(src("storefront.png"))
+  .modulate({ brightness: 1.26, saturation: 1.5 })
+  // Lifts the shadows a little so the recess around the door does not read as
+  // a black hole once the frame is brighter overall.
+  .linear(1.04, 6)
+  // Counters the softening from the push-in, at the one size we ship.
+  .sharpen({ sigma: 0.6 })
+  .webp({ quality: 82 })
   .toFile(out("media", "storefront.webp"));
 
 
