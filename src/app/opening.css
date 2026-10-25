@@ -1,36 +1,37 @@
 /* ===========================================================================
    The opening sequence.
 
-   One shopfront, three acts, no cuts. Every layer reads the same `--p` (0 at
-   the top of the track, 1 at the bottom) and derives its own opacity and
-   transform from it. No JavaScript touches any of these properties.
+   One shot, used once. Every layer reads the same progress value written to
+   the stage by useScrollProgress — `--p` linear, `--pe` eased — and derives
+   its own opacity and transform from it in CSS. No JavaScript touches any of
+   these properties.
 
-   The cue sheet, in --p:
-     0.00 .. 0.14   the street at night, shop shut, camera easing in
-     0.14 .. 0.26   "THE WORLD STARVES." lifts away
-     0.26 .. 0.40   to black
-     0.42 .. 0.66   "WE HAVE A SOLUTION."
-     0.58 .. 0.76   the black lifts and the lights come up on the same frame
-     0.70 .. 0.88   the sign lights, the doorway glows
-     0.78 .. 0.96   the door swings open and light reaches the pavement
+   The cue sheet:
+     0.00 .. 0.10   the shop at rest, lit, our name over the door
+     0.08 .. 0.60   the camera pushes toward the doorway
+     0.16 .. 0.50   the door swings open and light reaches the pavement
+     0.50 .. 0.66   through the door and into the dark
+     0.66 .. 0.84   "THE WORLD STARVES."
+     0.84 .. 1.00   "WE HAVE A SOLUTION."
    =========================================================================== */
 
 .opening-track {
   position: relative;
-  height: 460vh;
-  background: #0a0a0a;
+  height: 560vh;
+  background: #060606;
 }
 
 .opening-stage {
   --p: 0;
+  --pe: 0;
   position: sticky;
   top: 0;
   height: 100svh;
   overflow: hidden;
-  background: #0a0a0a;
+  background: #060606;
 }
 
-/* ------------------------------------------------------------- the scene - */
+/* ------------------------------------------------------------- the shot - */
 
 /*
   A box with the photograph's own aspect ratio, grown until it covers the
@@ -44,34 +45,42 @@
   top: 50%;
   width: max(100vw, calc(100svh * 1328 / 744));
   height: max(100svh, calc(100vw * 744 / 1328));
-  /* A slow push toward the door across the whole sequence. */
-  transform: translate(-50%, -50%) scale(calc(1 + var(--p) * 0.12));
+  transform: translate(-50%, -50%);
+}
+
+/*
+  The push-in lives on its own element so its origin is the doorway, not the
+  frame's centre. Putting the scale on .scene would make the origin fight the
+  centring translate, and the camera would drift toward the middle of the
+  picture instead of toward the door.
+
+  Driven by the eased progress, so it leaves rest gently and settles rather
+  than tracking the scrollbar at a constant speed.
+*/
+.scene-zoom {
+  position: absolute;
+  inset: 0;
+  transform-origin: var(--focus-x, 50%) var(--focus-y, 60%);
+  transform: scale(calc(1 + clamp(0, calc((var(--pe) - 0.08) / 0.52), 1) * 0.95));
 }
 
 .scene-photo {
   position: absolute;
   inset: 0;
-  background-image: url(/media/storefront-1600.webp);
+  background-image: url(/media/storefront.webp);
   background-size: 100% 100%;
   background-position: center;
 }
 
 /*
-  Night over the whole frame. A flat cool-black wash rather than a CSS
-  brightness filter: filtering a viewport-sized image forces a full repaint on
-  every scroll frame, and this is one composited layer instead.
-*/
-.scene-night {
-  position: absolute;
-  inset: 0;
-  background: #05080a;
-  opacity: calc(clamp(0, calc((0.76 - var(--p)) / 0.18), 1) * 0.86);
-}
+  What is behind the door: nothing. A black interior, not a lit one.
 
-/*
-  The room behind the door. Built as an interior rather than a glowing panel:
-  the ceiling stays in shadow, the light pools low where a floor would catch
-  it, and the left jamb takes a soft shadow.
+  The shopfront is bright and inviting and the darkness is inside it, which is
+  the whole point of the sequence — and it means the cut to black is not an
+  effect laid over the shot but the place the camera actually arrives at.
+
+  Not a flat fill: a faint cool wash down the left jamb and a touch of lift at
+  the floor line, so it reads as depth rather than as a hole cut in the photo.
 */
 .doorway {
   position: absolute;
@@ -80,53 +89,50 @@
   width: 11.3%;
   height: 45.7%;
   background:
-    linear-gradient(90deg, rgba(40, 24, 6, 0.55) 0%, rgba(40, 24, 6, 0) 22%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 26%),
     linear-gradient(
       180deg,
-      rgba(26, 16, 5, 0.95) 0%,
-      rgba(96, 60, 16, 0.5) 16%,
-      rgba(243, 203, 128, 0.82) 54%,
-      rgba(255, 226, 168, 0.95) 82%,
-      rgba(214, 170, 104, 0.88) 100%
-    ),
-    #2a1c0a;
-  opacity: clamp(0, calc((var(--p) - 0.74) / 0.14), 1);
+      #000 0%,
+      #050506 54%,
+      #0a0a0c 86%,
+      #101013 100%
+    );
+  opacity: clamp(0, calc((var(--p) - 0.14) / 0.16), 1);
 }
 
 /* The door: a slice of the same photograph, hinged on its right stile (the
-   handle in the shot is on the left, so that is where the hinges are). */
+   handle in the shot is on the left, so that is where the hinges are).
+
+   It swings away from the viewer — a push, not a pull — so the camera follows
+   it into the room instead of having it open outward across the shot. That is
+   a negative rotation about the right edge; positive would bring the free edge
+   toward the viewer. */
 .door {
   position: absolute;
   left: 44.43%;
   top: 37.63%;
   width: 11.3%;
   height: 45.7%;
-  background-image: url(/media/storefront-1600.webp);
+  background-image: url(/media/storefront.webp);
   background-repeat: no-repeat;
   transform-origin: right center;
-  transform: perspective(1400px)
-    rotateY(calc(clamp(0, calc((var(--p) - 0.78) / 0.2), 1) * 74deg));
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+  transform: perspective(1200px)
+    rotateY(calc(clamp(0, calc((var(--p) - 0.16) / 0.34), 1) * -86deg));
 }
 
-/* Light falling out onto the wet pavement. This is what makes the shop read
-   as open rather than merely lit from within. */
-.door-spill {
+/* The free edge is receding into an unlit room, so the panel loses its light
+   as it swings. Done as an overlay whose opacity changes rather than a
+   brightness filter: a filter on a moving element repaints it every frame,
+   where opacity is composited. */
+.door::after {
+  content: "";
   position: absolute;
-  left: 40%;
-  top: 80%;
-  width: 20%;
-  height: 16%;
-  background: radial-gradient(
-    60% 50% at 50% 20%,
-    rgba(255, 221, 156, 0.5),
-    rgba(255, 208, 132, 0.18) 55%,
-    rgba(255, 200, 120, 0) 100%
-  );
-  opacity: clamp(0, calc((var(--p) - 0.82) / 0.16), 1);
+  inset: 0;
+  background: #000;
+  opacity: calc(clamp(0, calc((var(--p) - 0.16) / 0.34), 1) * 0.62);
 }
 
-/* The blank sign board in the photograph is where our name goes. */
+/* Our name, over the door, from the first frame. */
 .sign {
   position: absolute;
   left: 13.93%;
@@ -137,7 +143,6 @@
   align-items: center;
   justify-content: center;
   gap: clamp(0.5rem, 1.4vw, 1.5rem);
-  opacity: clamp(0, calc((var(--p) - 0.7) / 0.16), 1);
 }
 
 .sign-mark {
@@ -154,19 +159,43 @@
   line-height: 1;
 }
 
+/* Tightens as the camera moves in, so the frame closes toward the doorway and
+   the edges of a 1328px photograph never have to hold up at 2x. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 78% 68% at var(--focus-x, 50%) var(--focus-y, 60%),
+    rgba(0, 0, 0, 0) 40%,
+    rgba(0, 0, 0, 0.55) 78%,
+    rgba(0, 0, 0, 0.92) 100%
+  );
+  opacity: clamp(0, calc((var(--p) - 0.1) / 0.4), 1);
+}
+
+/* Anchored to the viewport's foot, not the scene, so the type along the
+   bottom keeps something to sit against while the shot scales away behind it.
+   Clears once the push-in is under way and the frame has darkened anyway. */
+.base-scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 36%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 6, 6, 0) 0%, rgba(6, 6, 6, 0.78) 100%);
+  opacity: clamp(0, calc((0.16 - var(--p)) / 0.1), 1);
+}
+
 /* -------------------------------------------------------------- blackout - */
 
-/* Covers the scene between the acts. Because the frame underneath never
-   changes, lifting this is what reads as the lights coming on. */
+/* Stepping through. Holds for the rest of the sequence — the shot is done. */
 .blackout {
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: #0a0a0a;
-  opacity: min(
-    clamp(0, calc((var(--p) - 0.26) / 0.14), 1),
-    clamp(0, calc((0.76 - var(--p)) / 0.14), 1)
-  );
+  background: #060606;
+  opacity: clamp(0, calc((var(--p) - 0.5) / 0.16), 1);
 }
 
 /* ----------------------------------------------------------------- acts -- */
@@ -174,32 +203,33 @@
 .act {
   position: absolute;
   z-index: 3;
-  /* Faded-out act text still occupies the centre of the screen and would keep
-     swallowing taps and text selection. It is decorative once it has gone. */
-  pointer-events: none;
   left: clamp(1.25rem, 6vw, 6rem);
   right: clamp(1.25rem, 6vw, 6rem);
+  top: 50%;
+  translate: 0 -50%;
+  /* Faded-out act text still sits across the middle of the screen and would
+     keep swallowing taps and text selection. It is decorative once gone. */
+  pointer-events: none;
 }
 
 /*
-  Display type set the way the reference sets it: very large, uppercase,
-  negative tracking, and a line-height tighter than the type size so the lines
-  lock together as a block. Zilla Slab at 700 carries it — a slab serif at this
-  scale has the weight of a masthead rather than of a product headline.
+  Very large, uppercase, negative tracking, and a line-height tighter than the
+  type size so the lines lock together as a block. Zilla Slab at 700 carries
+  it: a slab serif at this scale has the weight of a masthead.
 */
 .act-title {
   margin: 0;
+  max-width: 16ch;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(2.75rem, 11.5vw, 8.5rem);
   line-height: 0.86;
   letter-spacing: -0.025em;
   text-transform: uppercase;
-  /* Warm off-white, never pure white: it sits on a photograph, and #fff reads
-     as a UI element dropped on top of one. */
+  /* Warm off-white, never pure white: pure white reads as a UI element
+     dropped on top of the page rather than part of it. */
   color: #f7f5f0;
   text-wrap: balance;
-  max-width: 15ch;
 }
 
 /* The one accent in the sequence. Green means available everywhere else in
@@ -209,36 +239,37 @@
 }
 
 .act-eyebrow {
-  margin: 0 0 clamp(0.75rem, 2vw, 1.25rem);
+  margin: 0;
   font-family: var(--font-sans);
   font-size: clamp(0.6875rem, 1.1vw, 0.8125rem);
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(247, 245, 240, 0.6);
+  color: rgba(247, 245, 240, 0.82);
 }
 
-/* Act I sits in the lower third, off the shop's white sign board and where
-   the frame is darkest. */
+/* Act I rides over the shot, so it sits low and left where the frame is
+   quietest, and clears early — before the camera starts moving. */
 .act-1 {
+  top: auto;
   bottom: clamp(4.5rem, 14vh, 9rem);
-  opacity: clamp(0, calc((0.26 - var(--p)) / 0.12), 1);
-  transform: translateY(calc(var(--p) * -60px));
+  translate: none;
+  opacity: clamp(0, calc((0.1 - var(--p)) / 0.06), 1);
 }
 
-/* Act II is a title card on black, so it sits on the centre line. */
-.act-2 .act-title {
-  max-width: 16ch;
-}
-
+/* The two lines on black, one after the other. Each rises a little as it
+   arrives, which is the only thing moving at that point. */
 .act-2 {
-  top: 50%;
-  translate: 0 -50%;
   opacity: min(
-    clamp(0, calc((var(--p) - 0.42) / 0.1), 1),
-    clamp(0, calc((0.68 - var(--p)) / 0.08), 1)
+    clamp(0, calc((var(--p) - 0.66) / 0.08), 1),
+    clamp(0, calc((0.84 - var(--p)) / 0.06), 1)
   );
-  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.42) / 0.12), 1)) * 28px));
+  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.66) / 0.1), 1)) * 26px));
+}
+
+.act-3 {
+  opacity: clamp(0, calc((var(--p) - 0.86) / 0.08), 1);
+  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.86) / 0.1), 1)) * 26px));
 }
 
 /* ----------------------------------------------------------- scroll cue -- */
@@ -256,7 +287,7 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(247, 245, 240, 0.65);
-  opacity: clamp(0, calc((0.08 - var(--p)) / 0.05), 1);
+  opacity: clamp(0, calc((0.06 - var(--p)) / 0.04), 1);
 }
 
 .scroll-cue-rule {
@@ -281,10 +312,11 @@
 }
 
 /* ===========================================================================
-   Reduced motion, and anything that cannot run the above.
+   Reduced motion.
 
-   The three acts become three ordinary panels you scroll past. Same frame,
-   same words, same order — nothing moves on its own.
+   The sequence becomes panels you scroll past: the shop with its door open,
+   then each line on black. Same shot, same words, same order — nothing moves
+   on its own.
    =========================================================================== */
 
 .opening-track[data-still="true"] {
@@ -306,28 +338,36 @@
   transform: none;
 }
 
-.opening-track[data-still="true"] .scene-night,
+.opening-track[data-still="true"] .scene-zoom {
+  transform: none;
+}
+
+.opening-track[data-still="true"] .vignette,
 .opening-track[data-still="true"] .blackout {
   display: none;
 }
 
-.opening-track[data-still="true"] .doorway,
-.opening-track[data-still="true"] .sign,
-.opening-track[data-still="true"] .door-spill {
+.opening-track[data-still="true"] .doorway {
   opacity: 1;
 }
 
 .opening-track[data-still="true"] .door {
-  transform: perspective(1400px) rotateY(74deg);
+  transform: perspective(1200px) rotateY(82deg);
 }
 
 .opening-track[data-still="true"] .act {
   position: static;
-  max-width: none;
+  translate: none;
   opacity: 1;
   transform: none;
-  translate: none;
   padding: clamp(2.5rem, 8vw, 5rem) clamp(1.25rem, 6vw, 6rem);
+}
+
+.opening-track[data-still="true"] .act-1 {
+  position: absolute;
+  bottom: clamp(2rem, 6vw, 4rem);
+  left: clamp(1.25rem, 6vw, 6rem);
+  padding: 0;
 }
 
 .opening-track[data-still="true"] .scroll-cue {

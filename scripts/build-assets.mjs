@@ -106,15 +106,29 @@ await half("plate-seeker.webp", 0.02);
 await half("plate-provider.webp", 0.5);
 
 /* ---------------------------------------------------------- storefront ---
- * Act III of the opening. The sign board in the shot is blank, which is where
- * the mark lands once the door opens.
+ * The whole opening, and the only time this shot is used.
+ *
+ * Graded warm and bright rather than left as shot: the original is a flat,
+ * grey, overcast frame, and the sequence opens on a shop that should look like
+ * somewhere you would want to walk into. Done here in the pipeline rather than
+ * with a CSS filter, because filtering a viewport-sized image forces a full
+ * repaint on every frame of the scroll — which is exactly the cost the phones
+ * this product targets cannot absorb.
+ *
+ * Kept at the source's own 1328px rather than upscaled. The sequence pushes
+ * in past 1.5x, which does soften it — but the push ends in a fade to black,
+ * so the softest frame is also the one nobody sees. Upscaling first would add
+ * weight without adding detail.
  */
-for (const w of [1600, 900]) {
-  await sharp(src("storefront.png"))
-    .resize(w, null, { withoutEnlargement: true })
-    .webp({ quality: 78 })
-    .toFile(out("media", `storefront-${w}.webp`));
-}
+await sharp(src("storefront.png"))
+  .modulate({ brightness: 1.26, saturation: 1.5 })
+  // Lifts the shadows a little so the recess around the door does not read as
+  // a black hole once the frame is brighter overall.
+  .linear(1.04, 6)
+  // Counters the softening from the push-in, at the one size we ship.
+  .sharpen({ sigma: 0.6 })
+  .webp({ quality: 82 })
+  .toFile(out("media", "storefront.webp"));
 
 
 /* ------------------------------------------------------------ manifest ---- */
@@ -125,7 +139,7 @@ for (const f of [
   "media/plates-1600.webp",
   "media/plate-seeker.webp",
   "media/plate-provider.webp",
-  "media/storefront-1600.webp",
+  "media/storefront.webp",
 ]) {
   if (await exists(out(f))) {
     const { size } = await sharp(out(f))

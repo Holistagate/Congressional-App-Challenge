@@ -1,0 +1,351 @@
+/* ===========================================================================
+   The role chooser.
+
+   It surfaces out of the same near-black the opening sequence ends in, so
+   there is no seam where one becomes the other: the page stays dark and the
+   table arrives in it. ChooserReveal writes `--p` as the section approaches,
+   and the dissolve below reads it.
+
+   The photograph sets two places, and those two plates are the two choices.
+   Each button is lifted off the china with a shadow cast onto it — that is
+   what tells you it is an object resting on a surface in a photograph rather
+   than a label printed into it, and it is why this is the one place in the
+   product that uses a shadow at all.
+   =========================================================================== */
+
+.chooser {
+  --p: 1;
+  --pe: 1;
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  /* The same black the sequence fades to. The join has to be invisible. */
+  background: #060606;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.5rem, 4.5vh, 3rem) 1rem clamp(1.25rem, 3.5vh, 2.5rem);
+}
+
+/* ------------------------------------------------------------- the type - */
+
+.chooser-intro {
+  position: relative;
+  z-index: 4;
+  text-align: center;
+  margin: 0 auto clamp(1.25rem, 3.5vh, 2.25rem);
+  /* Arrives first and from a touch lower, so the eye has somewhere to land
+     before the table resolves behind it. */
+  opacity: clamp(0, calc((var(--p) - 0.1) / 0.28), 1);
+  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.1) / 0.3), 1)) * 18px));
+}
+
+.chooser-eyebrow {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-sans);
+  font-size: clamp(0.625rem, 1vw, 0.75rem);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(247, 245, 240, 0.5);
+}
+
+.chooser-heading {
+  margin: 0 auto;
+  max-width: 22ch;
+  color: #f7f5f0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.625rem, 4.6vw, 2.75rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------- phones: stacked frames --- */
+
+.chooser-table {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  /* The dissolve. Settles from very slightly enlarged, which reads as coming
+     into focus rather than sliding into place. */
+  opacity: clamp(0, calc((var(--p) - 0.16) / 0.4), 1);
+  transform: scale(calc(1.05 - clamp(0, calc((var(--p) - 0.16) / 0.46), 1) * 0.05));
+}
+
+.plate {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 11rem;
+  padding: 1.5rem 1.25rem 4rem;
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  background-color: #241a12;
+  background-size: cover;
+  background-position: center;
+  isolation: isolate;
+}
+
+.plate-seeker {
+  background-image: url(/media/plate-seeker.webp);
+}
+
+.plate-provider {
+  background-image: url(/media/plate-provider.webp);
+}
+
+/* Darkens each frame toward its edges so the china, and the button on it,
+   stay the brightest thing in view. */
+.plate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(
+    ellipse 72% 62% at 50% 45%,
+    rgba(0, 0, 0, 0) 45%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------- the button -- */
+
+.plate-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.875rem 1.875rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-pine);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: clamp(1rem, 3.6vw, 1.1875rem);
+  line-height: 1.15;
+  text-align: center;
+  letter-spacing: -0.005em;
+  box-shadow:
+    0 14px 22px -10px rgba(0, 0, 0, 0.7),
+    0 3px 8px -2px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.22s ease;
+}
+
+/* The shadow the button casts onto the china. A separate blurred ellipse
+   rather than more box-shadow, because a cast shadow lands on the plate below
+   the button and spreads — it is not a halo around the button's own edge. */
+.plate-btn::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 6%;
+  right: 6%;
+  bottom: -0.9rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: rgba(22, 16, 8, 0.5);
+  filter: blur(10px);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease;
+}
+
+/* The supporting line sits on the wood at the foot of the frame: white text
+   on white china is a poor bet however much shadow it carries. */
+.plate-sub {
+  position: absolute;
+  left: 50%;
+  bottom: 1.125rem;
+  translate: -50% 0;
+  z-index: 2;
+  max-width: 26ch;
+  text-align: center;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: #f7f5f0;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.9),
+    0 2px 14px rgba(0, 0, 0, 0.8);
+}
+
+/* Rises further off the plate, and the cast shadow drops away and softens the
+   way a real one would. */
+.plate:hover .plate-btn,
+.plate:focus-visible .plate-btn {
+  transform: translateY(-5px);
+  background: #18602f;
+  box-shadow:
+    0 24px 34px -12px rgba(0, 0, 0, 0.75),
+    0 6px 14px -2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.plate:hover .plate-btn::after,
+.plate:focus-visible .plate-btn::after {
+  transform: translateY(6px) scaleX(1.1);
+  opacity: 0.68;
+}
+
+.plate:active .plate-btn {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 18px -8px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.plate:active .plate-btn::after {
+  transform: translateY(0) scaleX(0.94);
+  opacity: 1;
+}
+
+.plate:focus-visible {
+  outline: 3px solid #f7f5f0;
+  outline-offset: 3px;
+}
+
+/* ------------------------------ tablet and up: the table fills the screen - */
+
+@media (min-width: 48rem) {
+  .chooser {
+    display: block;
+    padding: 0;
+  }
+
+  /*
+    The photograph, grown until it covers the viewport and centred — the same
+    technique the shopfront uses. Fixing the box to the shot's own aspect
+    ratio is what lets the two plate positions below stay percentages taken
+    straight off the source image: the picture can fill any screen and the
+    buttons stay on the china.
+  */
+  .chooser-table {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    top: 50%;
+    display: block;
+    width: max(100vw, calc(100svh * 1537 / 1023));
+    height: max(100svh, calc(100vw * 1023 / 1537));
+    max-width: none;
+    margin: 0;
+    background: url(/media/plates-1600.webp) center / 100% 100% no-repeat;
+    transform: translate(-50%, -50%)
+      scale(calc(1.05 - clamp(0, calc((var(--p) - 0.16) / 0.46), 1) * 0.05));
+  }
+
+  /* Closes the frame toward the two settings and gives the heading something
+     to sit against at the top. */
+  .chooser::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(6, 6, 6, 0.82) 0%, rgba(6, 6, 6, 0) 34%),
+      radial-gradient(ellipse 80% 70% at 50% 52%, rgba(0, 0, 0, 0) 48%, rgba(0, 0, 0, 0.6) 100%);
+    opacity: clamp(0, calc((var(--p) - 0.16) / 0.4), 1);
+  }
+
+  .chooser-intro {
+    position: absolute;
+    z-index: 4;
+    top: clamp(2rem, 7vh, 4.5rem);
+    left: 50%;
+    margin: 0;
+    width: min(90vw, 42rem);
+    transform: translateX(-50%)
+      translateY(calc((1 - clamp(0, calc((var(--p) - 0.1) / 0.3), 1)) * 18px));
+  }
+
+  /* Centres measured off design/source/plates.png. */
+  .plate {
+    position: absolute;
+    z-index: 3;
+    min-height: 0;
+    padding: 0;
+    border-radius: 999px;
+    background-image: none;
+    background-color: transparent;
+    width: 31%;
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    overflow: visible;
+  }
+
+  /* The per-frame vignette belongs to the phone layout only; on the wide shot
+     the section's own gradient does that job. */
+  .plate::before {
+    display: none;
+  }
+
+  .plate-seeker {
+    left: 28.6%;
+    top: 47.6%;
+  }
+
+  .plate-provider {
+    left: 69.3%;
+    top: 47%;
+  }
+
+  .plate-btn {
+    min-height: 3rem;
+    padding: 0.8125rem clamp(1rem, 2.2vw, 2rem);
+    font-size: clamp(0.9375rem, 1.5vw, 1.25rem);
+    white-space: nowrap;
+  }
+
+  /* On the wide shot there is wood below each plate for the line to sit on,
+     so it hangs just outside the circle rather than inside it. */
+  .plate-sub {
+    top: calc(100% + 0.5rem);
+    bottom: auto;
+    width: 24ch;
+    max-width: 90vw;
+    font-size: clamp(0.8125rem, 1.05vw, 0.9375rem);
+  }
+}
+
+/* ------------------------------------------------------- reduced motion - */
+
+/* Nothing dissolves; the chooser is simply there. */
+.chooser[data-still="true"] .chooser-intro,
+.chooser[data-still="true"] .chooser-table,
+.chooser[data-still="true"]::after {
+  opacity: 1;
+}
+
+.chooser[data-still="true"] .chooser-intro {
+  transform: none;
+}
+
+.chooser[data-still="true"] .chooser-table {
+  transform: none;
+}
+
+@media (min-width: 48rem) {
+  .chooser[data-still="true"] .chooser-table {
+    transform: translate(-50%, -50%);
+  }
+
+  .chooser[data-still="true"] .chooser-intro {
+    transform: translateX(-50%);
+  }
+}

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Opening } from "@/components/Opening";
+import { ChooserReveal } from "@/components/ChooserReveal";
 import { SiteFooter } from "@/components/SiteFooter";
 import { currentUser } from "@/lib/session";
 import { translator } from "@/lib/i18n";
 import { getLang } from "@/lib/i18n-server";
 import "./opening.css";
+import "./chooser.css";
 import "./landing.css";
 
 export const metadata: Metadata = {
@@ -28,17 +30,20 @@ export default async function LandingPage() {
       />
 
       <main id="main">
-        {/* The two plates in the photograph are the two choices. No icons, no
-            cards — you are choosing a seat at the table. */}
-        <section className="chooser" aria-labelledby="chooser-heading">
-          <h2 id="chooser-heading" className="chooser-heading">
-            {t("landing.choose")}
-          </h2>
+        {/* Surfaces out of the same dark the opening ends in. The two plates
+            in the photograph are the two choices — no icons, no cards. You
+            are choosing a seat at the table. */}
+        <ChooserReveal>
+          <div className="chooser-intro">
+            <p className="chooser-eyebrow">{t("landing.chooseEyebrow")}</p>
+            <h2 id="chooser-heading" className="chooser-heading">
+              {t("landing.choose")}
+            </h2>
+          </div>
 
-          {/* The two plates in the photograph are the two choices. The button
-              on each one is lifted off the china with a contact shadow, so it
-              reads as an object resting on the plate rather than a label
-              printed on it. */}
+          {/* The button on each plate is lifted off the china with a shadow
+              cast onto it, so it reads as an object resting on the plate
+              rather than a label printed into it. */}
           <div className="chooser-table">
             <Link href="/food" className="plate plate-seeker">
               <span className="plate-btn">{t("landing.seeker")}</span>
@@ -50,7 +55,7 @@ export default async function LandingPage() {
               <span className="plate-sub">{t("landing.providerSub")}</span>
             </Link>
           </div>
-        </section>
+        </ChooserReveal>
 
         <section className="explainer" aria-labelledby="how-heading">
           <div className="explainer-inner">

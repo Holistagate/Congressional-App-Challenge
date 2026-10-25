@@ -39,10 +39,11 @@ const en = {
   "nav.language": "Language",
 
   /* landing */
-  "landing.eyebrow": "Tonight, somewhere near you",
+  "landing.eyebrow": "Free food, from restaurants near you",
   "landing.act1": "The world starves",
   "landing.act2": "We have a solution",
   "landing.scroll": "Scroll",
+  "landing.chooseEyebrow": "Two ways in",
   "landing.choose": "Which brings you here?",
   "landing.seeker": "I need food",
   "landing.seekerSub": "See what's free near you right now. No account needed.",
@@ -212,10 +213,11 @@ const es: Record<Key, string> = {
   "nav.skip": "Saltar al contenido principal",
   "nav.language": "Idioma",
 
-  "landing.eyebrow": "Esta noche, cerca de ti",
+  "landing.eyebrow": "Comida gratis, de restaurantes cerca de ti",
   "landing.act1": "El mundo pasa hambre",
   "landing.act2": "Tenemos una solución",
   "landing.scroll": "Desplázate",
+  "landing.chooseEyebrow": "Dos formas de entrar",
   "landing.choose": "¿Qué te trae por aquí?",
   "landing.seeker": "Necesito comida",
   "landing.seekerSub": "Mira qué hay gratis cerca de ti ahora. No hace falta cuenta.",
