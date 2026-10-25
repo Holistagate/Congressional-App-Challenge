@@ -72,38 +72,6 @@ for (const size of [512, 192]) {
     .toFile(out("icons", `maskable-${size}.png`));
 }
 
-/* -------------------------------------------------------------- plates ---
- * The role chooser. On wide screens the photo is used whole: the two plates
- * in the shot are the two choices. On a phone that composition collapses, so
- * we also cut each plate out as its own crop and stack them.
- */
-const plates = sharp(src("plates.png"));
-const pm = await plates.metadata();
-
-await sharp(src("plates.png"))
-  .resize(1600, null, { withoutEnlargement: true })
-  .webp({ quality: 74 })
-  .toFile(out("media", "plates-1600.webp"));
-
-await sharp(src("plates.png"))
-  .resize(900, null, { withoutEnlargement: true })
-  .webp({ quality: 72 })
-  .toFile(out("media", "plates-900.webp"));
-
-const half = (name, left) =>
-  sharp(src("plates.png"))
-    .extract({
-      left: Math.round(pm.width * left),
-      top: Math.round(pm.height * 0.17),
-      width: Math.round(pm.width * 0.47),
-      height: Math.round(pm.height * 0.62),
-    })
-    .resize(760, null, { withoutEnlargement: true })
-    .webp({ quality: 74 })
-    .toFile(out("media", name));
-
-await half("plate-seeker.webp", 0.02);
-await half("plate-provider.webp", 0.5);
 
 /* ---------------------------------------------------------- storefront ---
  * The whole opening, and the only time this shot is used.
@@ -136,10 +104,9 @@ const report = [];
 for (const f of [
   "icons/mark-512.png",
   "icons/maskable-512.png",
-  "media/plates-1600.webp",
-  "media/plate-seeker.webp",
-  "media/plate-provider.webp",
   "media/storefront.webp",
+  "media/plate-a.png",
+  "media/fork-cursor.png",
 ]) {
   if (await exists(out(f))) {
     const { size } = await sharp(out(f))
@@ -150,3 +117,82 @@ for (const f of [
   }
 }
 console.log("built assets:\n" + report.join("\n"));
+
+/* ------------------------------------------------------------ the table ---
+ * The role chooser's two settings.
+ *
+ * The source is a portrait flat-lay: two plates stacked on a flat sage field.
+ * That covers a phone beautifully and cannot fill a landscape screen at all,
+ * so rather than crop it we lift each plate out and let the page supply the
+ * field itself as a flat colour. The plates can then be laid out side by side
+ * or stacked, at any aspect ratio, with no crop and no letterboxing.
+ *
+ * The cut is feathered rather than hard-edged: the field has a gentle vignette
+ * (about #CEDEC7 to #D6E6D2), so a crisp circle would show a faint disc
+ * wherever the crop's green met the page's. Fading the alpha out over the last
+ * few per cent hides the join entirely.
+ */
+/* Centres and radii found by scanning the source for bright, low-saturation
+ * pixels rather than by eye — the plates sit lower in the frame than they
+ * look, and a crop off by thirty pixels puts the feather through the rim.
+ * The china photographs as a slight ellipse (581 x 526), so the box is cut
+ * wide enough for the mask to clear it on both axes. */
+const PLATE = { size: 660, out: 560 };
+
+const feather = (px) =>
+  Buffer.from(
+    `<svg width="${px}" height="${px}">
+       <defs>
+         <radialGradient id="f" cx="50%" cy="50%" r="50%">
+           <stop offset="0%"  stop-color="#fff" stop-opacity="1"/>
+           <stop offset="93%" stop-color="#fff" stop-opacity="1"/>
+           <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+         </radialGradient>
+       </defs>
+       <rect width="${px}" height="${px}" fill="url(#f)"/>
+     </svg>`,
+  );
+
+async function cutPlate(name, centreX, centreY) {
+  const half = PLATE.size / 2;
+  const cut = await sharp(src("plates-flatlay.png"))
+    .extract({
+      left: Math.round(centreX - half),
+      top: Math.round(centreY - half),
+      width: PLATE.size,
+      height: PLATE.size,
+    })
+    .resize(PLATE.out, PLATE.out)
+    .png()
+    .toBuffer();
+
+  await sharp(cut)
+    .composite([{ input: feather(PLATE.out), blend: "dest-in" }])
+    .png({ compressionLevel: 9 })
+    .toFile(out("media", name));
+}
+
+await cutPlate("plate-a.png", 510, 405);
+await cutPlate("plate-b.png", 511, 1072);
+
+/* ------------------------------------------------------------ the fork ----
+ * The chooser's cursor.
+ *
+ * Rotated so the tines lead up and to the left, where a pointer's tip belongs,
+ * and kept to 40px: browsers reject or mishandle larger cursors, and anything
+ * bigger stops reading as a pointer and starts obscuring what it is pointing
+ * at. The page pairs it with a hotspot at the tip and falls back to `pointer`.
+ */
+const forkRotated = await sharp(src("fork.png"))
+  .rotate(-90, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png()
+  .toBuffer();
+
+// Trim before fitting. Rotating a diagonal object leaves transparent corners,
+// and scaling those into the box would shrink the fork to a sliver.
+await sharp(forkRotated)
+  .trim()
+  .resize(44, 44, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png({ compressionLevel: 9 })
+  .toFile(out("media", "fork-cursor.png"));
+

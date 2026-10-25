@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Zilla_Slab, Public_Sans } from "next/font/google";
+import { Zilla_Slab, Public_Sans, Montserrat } from "next/font/google";
 import "./globals.css";
 import { currentUser } from "@/lib/session";
 import { translator } from "@/lib/i18n";
@@ -24,6 +24,26 @@ const zilla = Zilla_Slab({
 const publicSans = Public_Sans({
   variable: "--font-public",
   subsets: ["latin"],
+  display: "swap",
+});
+
+/**
+ * Montserrat is the role chooser's voice, and only the chooser's.
+ *
+ * That screen wants the calm, airy, geometric treatment of a Japanese food
+ * brand — regular and medium weights, letters tracked apart rather than
+ * jammed together, lines given room to breathe — which is the exact opposite
+ * of the heavy, crushed slab the opening sequence is set in. A single family
+ * cannot do both, so the chooser gets its own.
+ *
+ * Montserrat because the reference is set in Gotham: both are geometric sans
+ * with a double-storey 'a' and a tall x-height, and Montserrat is the closest
+ * of the freely licensed faces.
+ */
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -60,7 +80,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const t = translator(lang);
 
   return (
-    <html lang={lang} className={`${zilla.variable} ${publicSans.variable} h-full`}>
+    <html lang={lang} className={`${zilla.variable} ${publicSans.variable} ${montserrat.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <a href="#main" className="skip-link">
           {t("nav.skip")}

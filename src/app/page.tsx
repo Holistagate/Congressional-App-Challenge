@@ -41,17 +41,20 @@ export default async function LandingPage() {
             </h2>
           </div>
 
-          {/* The button on each plate is lifted off the china with a shadow
-              cast onto it, so it reads as an object resting on the plate
-              rather than a label printed into it. */}
+          {/* Each plate is the target, label set on the china. The whole
+              setting responds, so there is no small button to hit. */}
           <div className="chooser-table">
-            <Link href="/food" className="plate plate-seeker">
-              <span className="plate-btn">{t("landing.seeker")}</span>
+            <Link href="/food" className="plate">
+              <span className="plate-disc plate-disc-a">
+                <span className="plate-label">{t("landing.seeker")}</span>
+              </span>
               <span className="plate-sub">{t("landing.seekerSub")}</span>
             </Link>
 
-            <Link href="/signup?role=provider" className="plate plate-provider">
-              <span className="plate-btn">{t("landing.provider")}</span>
+            <Link href="/signup?role=provider" className="plate">
+              <span className="plate-disc plate-disc-b">
+                <span className="plate-label">{t("landing.provider")}</span>
+              </span>
               <span className="plate-sub">{t("landing.providerSub")}</span>
             </Link>
           </div>

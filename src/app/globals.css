@@ -49,6 +49,11 @@
 
 :root {
   color-scheme: light;
+
+  /* Geometric sans, used only by the role chooser — see layout.tsx. Declared
+     here rather than in @theme because Tailwind prunes theme variables that
+     nothing in this file references, and its only consumer is chooser.css. */
+  --font-geo: var(--font-montserrat), "Helvetica Neue", Arial, sans-serif;
   /* Content measure. Body copy never exceeds this; see .measure below. */
   --measure: 64ch;
 }
