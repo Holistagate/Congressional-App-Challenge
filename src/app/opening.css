@@ -43,8 +43,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: max(100vw, calc(100svh * 1328 / 744));
-  height: max(100svh, calc(100vw * 744 / 1328));
+  width: max(100vw, calc(100svh * 1632 / 963));
+  height: max(100svh, calc(100vw * 963 / 1632));
   transform: translate(-50%, -50%);
 }
 
@@ -84,10 +84,6 @@
 */
 .doorway {
   position: absolute;
-  left: 44.43%;
-  top: 37.63%;
-  width: 11.3%;
-  height: 45.7%;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 26%),
     linear-gradient(
@@ -109,10 +105,6 @@
    toward the viewer. */
 .door {
   position: absolute;
-  left: 44.43%;
-  top: 37.63%;
-  width: 11.3%;
-  height: 45.7%;
   background-image: url(/media/storefront.webp);
   background-repeat: no-repeat;
   transform-origin: right center;
@@ -135,10 +127,6 @@
 /* Our name, over the door, from the first frame. */
 .sign {
   position: absolute;
-  left: 13.93%;
-  top: 15.86%;
-  width: 69.65%;
-  height: 15.73%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,9 +210,11 @@
   max-width: 16ch;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(2.75rem, 11.5vw, 8.5rem);
-  line-height: 0.86;
-  letter-spacing: -0.025em;
+  font-size: clamp(2.5rem, 10.5vw, 7.75rem);
+  /* Looser than the slab setting this replaces. Montserrat's capitals are
+     wide and round; crushed to 0.86 and tracked in hard they collide. */
+  line-height: 0.98;
+  letter-spacing: -0.012em;
   text-transform: uppercase;
   /* Warm off-white, never pure white: pure white reads as a UI element
      dropped on top of the page rather than part of it. */
@@ -334,7 +324,7 @@
   top: auto;
   width: 100%;
   height: auto;
-  aspect-ratio: 1328 / 744;
+  aspect-ratio: 1632 / 963;
   transform: none;
 }
 

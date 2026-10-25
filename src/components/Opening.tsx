@@ -23,8 +23,12 @@ import { useScrollProgress, usePrefersReducedMotion } from "@/lib/use-scroll-pro
  * nobody sees.
  */
 
-/* Measured off design/source/storefront.png (1328x744), as percentages. */
-const DOOR = { left: 44.43, top: 37.63, width: 11.3, height: 45.7 };
+/* Measured off design/source/storefront-sage.webp (1632x963), as percentages.
+   The handle sits on the left again, so the hinges are on the right. */
+const DOOR = { left: 48.71, top: 37.17, width: 9.62, height: 41.74 };
+
+/* The plain band of fascia above the windows — where a shop's name goes. */
+const SIGN = { left: 7.1, top: 16.1, width: 85.4, height: 9.3 };
 
 /* The point the camera moves toward: the middle of the doorway. */
 const FOCUS = {
@@ -35,6 +39,20 @@ const FOCUS = {
 /* Shows the door's own slice of the photograph inside the door element, so
    what swings open is the real door and not a drawn rectangle. Derived from
    DOOR so the two can never drift apart. */
+const doorBox = {
+  left: `${DOOR.left}%`,
+  top: `${DOOR.top}%`,
+  width: `${DOOR.width}%`,
+  height: `${DOOR.height}%`,
+};
+
+const signBox = {
+  left: `${SIGN.left}%`,
+  top: `${SIGN.top}%`,
+  width: `${SIGN.width}%`,
+  height: `${SIGN.height}%`,
+};
+
 const doorSlice = {
   backgroundSize: `${(100 / DOOR.width) * 100}% ${(100 / DOOR.height) * 100}%`,
   backgroundPosition: `${(DOOR.left / (100 - DOOR.width)) * 100}% ${
@@ -72,12 +90,12 @@ export function Opening({ eyebrow, act1, act2, scrollLabel, signAlt }: Props) {
         <div className="scene" aria-hidden="true">
           <div className="scene-zoom">
             <div className="scene-photo" />
-            <div className="doorway" />
-            <div className="door" style={doorSlice} />
+            <div className="doorway" style={doorBox} />
+            <div className="door" style={{ ...doorBox, ...doorSlice }} />
 
             {/* The sign is lit from the first frame: this is the shop already
                 carrying our name, not a reveal. */}
-            <div className="sign">
+            <div className="sign" style={signBox}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/icons/mark-192.png" alt="" className="sign-mark" width={96} height={96} />
               <span className="sign-word">MealBridge</span>
