@@ -69,7 +69,8 @@ export async function requestCode(_prev: FormState, data: FormData): Promise<For
   );
 
   await issueCode(id);
-  pruneExpired();
+  // pruneExpired is now a sync function in lib/session that only works locally,
+  // for cloud we rely on the cron route.
 
   return { ok: true, identifier: id.value, masked: maskIdentifier(id) };
 }
@@ -97,7 +98,7 @@ export async function submitCode(_prev: FormState, data: FormData): Promise<Form
   }
 
   const id = { kind: pending.kind, value: pending.identifier } as const;
-  const result = verifyCode(id, code.data);
+  const result = await verifyCode(id, code.data);
 
   if (!result.ok) {
     const message =
@@ -109,8 +110,8 @@ export async function submitCode(_prev: FormState, data: FormData): Promise<Form
     return { error: message, masked: pending.identifier };
   }
 
-  const existing = findUserByIdentifier(id);
-  const userId = existing?.id ?? upsertUser(id, { role: pending.role, name: pending.name });
+  const existing = await findUserByIdentifier(id);
+  const userId = existing?.id ?? await upsertUser(id, { role: pending.role, name: pending.name });
 
   await createSession(userId);
   jar.delete(PENDING_COOKIE);
@@ -169,7 +170,7 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
 
   // The ZIP has to exist in the bundled centroid table or distance sorting
   // would silently drop this business out of every search.
-  if (!zipExists(profile.data.zip)) {
+  if (!(await zipExists(profile.data.zip))) {
     return {
       error: "Check the highlighted fields",
       errors: { zip: "We don't recognise that ZIP code" },
@@ -182,7 +183,7 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     return { error: "Check the highlighted fields", errors: { identifier: "Enter an email address or phone number" }, values };
   }
 
-  if (findUserByIdentifier(id)) {
+  if (await findUserByIdentifier(id)) {
     return {
       error: "Check the highlighted fields",
       errors: { identifier: "There's already an account using that. Sign in instead." },
@@ -190,9 +191,9 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     };
   }
 
-  const userId = upsertUser(id, { role: "provider", name: profile.data.contact_name, language: account.data.language });
+  const userId = await upsertUser(id, { role: "provider", name: profile.data.contact_name, language: account.data.language });
 
-  run(
+  await run(
     `INSERT INTO providers (id, user_id, business_name, street, city, state, zip,
        contact_name, phone, email, permit_number, status, created_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,

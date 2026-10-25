@@ -41,8 +41,5 @@ yarn-error.log*
 next-env.d.ts
 
 # MealBridge
-/data/*.db
-/data/*.db-wal
-/data/*.db-shm
 dev.log
 tsconfig.tsbuildinfo

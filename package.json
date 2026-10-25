@@ -17,6 +17,7 @@
     "setup": "node scripts/db-setup.mjs && echo \"\nReady. Run: npm run dev\""
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
