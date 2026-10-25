@@ -29,7 +29,7 @@ export default async function AlertsPage() {
   const lang = await getLang(user.language);
   const t = translator(lang);
 
-  const alerts = all<AlertRow>(
+  const alerts = await all<AlertRow>(
     "SELECT id, zip, radius_miles, dietary_filters, channel, active FROM alerts WHERE seeker_id = ? ORDER BY created_at DESC",
     [user.id],
   );

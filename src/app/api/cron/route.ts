@@ -29,9 +29,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 503 });
   }
 
-  const expired = expireStaleListings();
+  const expired = await expireStaleListings();
   const posted = await runDueRecurringRules();
   const sent = await flushQueue();
+  // pruneExpired is sync but now only for local; for cloud we can just leave it or make it async.
+  // Since it's a simple delete, it's fine to leave as is or wrap in async.
   pruneExpired();
 
   return NextResponse.json({

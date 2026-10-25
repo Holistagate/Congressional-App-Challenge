@@ -18,19 +18,19 @@ export default async function AdminPage() {
 
   const lang = await getLang(user.language);
 
-  const pending = all<ProviderSummary>(
+  const pending = await all<ProviderSummary>(
     `SELECT id, business_name, street, city, state, zip, contact_name, phone, email,
             permit_number, status, created_at
      FROM providers WHERE status = 'pending' ORDER BY created_at ASC`,
   );
 
-  const others = all<ProviderSummary>(
+  const others = await all<ProviderSummary>(
     `SELECT id, business_name, street, city, state, zip, contact_name, phone, email,
             permit_number, status, created_at
-     FROM providers WHERE status != 'pending' ORDER BY business_name ASC`,
+     FROM providers WHERE status != 'pending' ORDER by business_name ASC`,
   );
 
-  const reports = all<ReportSummary>(
+  const reports = await all<ReportSummary>(
     `SELECT r.id, r.reason, r.details, r.created_at,
             l.id AS listing_id, l.description, l.status AS listing_status,
             p.business_name
@@ -43,18 +43,18 @@ export default async function AdminPage() {
 
   const stats = {
     activeListings:
-      get<{ n: number }>(
+      (await get<{ n: number }>(
         "SELECT COUNT(*) AS n FROM listings WHERE status = 'active' AND pickup_end > ?",
         [Date.now()],
-      )?.n ?? 0,
+      ))?.n ?? 0,
     portionsShared:
-      get<{ n: number }>(
+      (await get<{ n: number }>(
         "SELECT COALESCE(SUM(portions_total - portions_remaining), 0) AS n FROM listings",
-      )?.n ?? 0,
+      ))?.n ?? 0,
     approvedProviders:
-      get<{ n: number }>("SELECT COUNT(*) AS n FROM providers WHERE status = 'approved'")?.n ?? 0,
-    seekers: get<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE role = 'seeker'")?.n ?? 0,
-    activeAlerts: get<{ n: number }>("SELECT COUNT(*) AS n FROM alerts WHERE active = 1")?.n ?? 0,
+      (await get<{ n: number }>("SELECT COUNT(*) AS n FROM providers WHERE status = 'approved'")')?.n ?? 0,
+    seekers: (await get<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE role = 'seeker'")')?.n ?? 0,
+    activeAlerts: (await get<{ n: number }>("SELECT COUNT(*) AS n FROM alerts WHERE active = 1"))?.n ?? 0,
   };
 
   return (
