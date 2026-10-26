@@ -252,6 +252,11 @@ It sends the ZIP table in batches of a thousand and prints its progress; it
 takes a minute or two. Add `--no-seed` to skip the demo restaurants and start
 with an empty, real database.
 
+The seed includes two **daily recurring rules**, so `/api/cron` posts fresh
+listings every day and a deployed demo is never empty. Without them the
+one-off seeded listings expire within hours and anyone visiting the next day
+finds nothing.
+
 **3. Set the environment variables in Vercel** (Project → Settings →
 Environment Variables):
 
@@ -260,6 +265,10 @@ Environment Variables):
 | `TURSO_DATABASE_URL` | `libsql://…` from step 1 |
 | `TURSO_AUTH_TOKEN` | the token from step 1 |
 | `CRON_SECRET` | any random string — `/api/cron` refuses to run in production without it |
+
+Deploy to a region near the database. This one lives in `aws-us-east-1`, so
+Vercel's `iad1` keeps the round trip to a few milliseconds; the far side of the
+world would add a few hundred to every query.
 
 **4. Deploy.** `vercel.json` already schedules `/api/cron` every five minutes
 to expire listings, post recurring rules and flush the notification queue.

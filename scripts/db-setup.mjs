@@ -231,6 +231,47 @@ mkListing(harvest, {
 });
 
 // A seeker with a standing alert, so the matching path has something to match.
+// Standing schedules, so a deployed demo does not go empty.
+//
+// The one-off listings above expire within hours of seeding; anyone looking at
+// this a day later would find nothing. These rules make /api/cron post a fresh
+// listing every day, which is also the only thing that exercises the recurring
+// engine in a live deployment.
+//
+// Times are minutes past midnight in the SERVER's zone, which on Vercel is
+// UTC. A 10:00-23:59 UTC window is roughly 05:00-19:00 US Central, so there is
+// something live through most of a US day. See the note on recurring_rules
+// about per-restaurant timezones.
+const mkRule = (providerId, template, startMinutes = 600, endMinutes = 1439) => {
+  seedStatements.push({
+    sql: `INSERT INTO recurring_rules (id, provider_id, weekdays, start_minutes, end_minutes,
+            template, timezone, paused, created_at)
+          VALUES (?,?,?,?,?,?,?,0,?)`,
+    args: [
+      id("rec"), providerId, "1,2,3,4,5,6,7", startMinutes, endMinutes,
+      JSON.stringify(template), "UTC", now,
+    ],
+  });
+};
+
+mkRule(harvest, {
+  description: "Soup, bread and whatever is left on the hot counter at the end of service.",
+  portions: 20,
+  categories: ["hot_meals", "bakery"],
+  dietary_tags: ["vegetarian"],
+  allergen_tags: ["wheat"],
+  notes: "Side door on Harper Ave. Ask for whoever is on the pass.",
+});
+
+mkRule(blueDoor, {
+  description: "Yesterday's loaves and pastries. Still good, just not sellable.",
+  portions: 30,
+  categories: ["bakery"],
+  dietary_tags: ["vegetarian"],
+  allergen_tags: ["wheat", "milk", "eggs"],
+  notes: "Front counter.",
+});
+
 seedStatements.push({
   sql: "INSERT INTO alerts (id, seeker_id, zip, radius_miles, dietary_filters, channel, active, created_at) VALUES (?,?,?,?,?,?,1,?)",
   args: [id("alr"), seekerId, "60615", 10, JSON.stringify([]), "push", now],
