@@ -11,7 +11,20 @@ import { get, run, now } from "@/db/index";
  * when a process restarts is not a limit. Fixed window (not sliding) because
  * the failure mode — twice the allowance at a window boundary — is harmless
  * here, and the implementation stays small enough to reason about.
+ *
+ * Currently OFF. The cooldowns made the app tiring to demonstrate: five
+ * sign-in attempts in fifteen minutes is nothing when you are testing, and
+ * being told to come back in an hour mid-demo is worse than the thing the
+ * limit was protecting against.
+ *
+ * Be clear about what is given up. With this off, nothing slows down someone
+ * guessing a password, and the admin account's address is in the repository.
+ * A password is now the only thing in the way, and an unlimited number of
+ * guesses is a very different proposition from five. Turn it back on for
+ * anything that matters by setting RATE_LIMITS=on — no code change, and the
+ * limits below are unchanged and still correct.
  */
+const ENABLED = process.env.RATE_LIMITS === "on";
 
 export type LimitRule = { limit: number; windowMs: number };
 
@@ -48,6 +61,8 @@ export async function callerKey(userId?: string | null): Promise<string> {
 export type LimitResult = { ok: true } | { ok: false; retryAfterSeconds: number };
 
 export async function checkLimit(name: LimitName, key: string): Promise<LimitResult> {
+  if (!ENABLED) return { ok: true };
+
   const rule = LIMITS[name];
   const bucket = `${name}:${key}`;
   const t = now();

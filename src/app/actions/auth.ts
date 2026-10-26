@@ -62,8 +62,9 @@ export async function signIn(_prev: FormState, data: FormData): Promise<FormStat
     };
   }
 
-  // Still rate limited. Without a code step this is the only thing standing
-  // between the sign-in form and someone walking a list of addresses.
+  // Off by default — see lib/ratelimit.ts. With RATE_LIMITS=on this is what
+  // stands between the sign-in form and an unlimited number of password
+  // guesses.
   const gate = await limit("otpRequest");
   if (!gate.ok) {
     return { error: retryMessage(gate.retryAfterSeconds), values: { identifier: raw } };
