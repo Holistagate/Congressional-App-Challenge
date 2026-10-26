@@ -20,14 +20,26 @@ Open <http://localhost:3000>.
 
 ### Signing in to the demo
 
-Sign-in uses a 6-digit code instead of a password. With no email or SMS provider configured, **the code is printed to the terminal running `npm run dev`** — look for a boxed `EMAIL →` line.
+Sign-in takes an email address and nothing else — no password, no code. See [Authentication](#authentication) for why, and what it costs.
 
 | Role | Sign in with |
 | --- | --- |
 | Someone looking for food | `sam@example.com` |
 | An approved restaurant | `60615.harvest-table@example.com` |
 | A restaurant awaiting review | `60605.riverside-deli@example.com` |
-| Admin | `admin@mealbridge.example` |
+| Admin | whatever you set `ADMIN_EMAIL` to |
+
+**The admin address is deliberately not written down here.** Because signing in needs only an address, that address *is* the credential, and a credential in a public README is not one — anyone who reads this could otherwise approve restaurants and read every provider's contact details. Seeding a local database defaults it to `admin@mealbridge.local`, which is safe because the app is on your machine. Seeding a remote one refuses unless you set `ADMIN_EMAIL` to something only you know:
+
+```bash
+ADMIN_EMAIL=something-only-you-know@example.com npm run db:setup
+```
+
+It never has to receive mail. To change it on a database that is already seeded:
+
+```bash
+turso db shell <your-db> "UPDATE users SET email = 'new-address' WHERE role = 'admin'"
+```
 
 You don't need any of these to use the seeker side. Type a ZIP code — try **60615** — and the whole thing works signed out.
 

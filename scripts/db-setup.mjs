@@ -29,6 +29,35 @@ if (!remote) mkdirSync(localDir, { recursive: true });
 
 const db = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
 
+/**
+ * Who the admin is.
+ *
+ * Sign-in takes no password and no code, so this address is the entire
+ * credential: anyone who can type it can approve restaurants and read every
+ * provider's contact details. A literal here would be committed, and a
+ * committed admin credential is not one.
+ *
+ * Locally that does not matter — the app is on your machine — so a fixed
+ * address keeps `npm run db:setup` working on a fresh clone. Against a remote
+ * database it matters entirely, so there it is required rather than defaulted.
+ * The footgun only exists in the case where it would actually go off.
+ */
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? (url.startsWith("file:") ? "admin@mealbridge.local" : null);
+
+if (!ADMIN_EMAIL) {
+  console.error(`
+Refusing to seed a remote database without ADMIN_EMAIL.
+
+Signing in needs only this address, so seeding a known one into a public
+deployment hands the admin page to anyone who can guess it. Pick something
+only you know — it never has to receive mail — and set it in the same place
+as your other variables:
+
+    ADMIN_EMAIL=... npm run db:setup
+`);
+  process.exit(1);
+}
+
 console.log(remote ? `target: ${url.replace(/\/\/.*@/, "//")}` : `target: ${url}`);
 
 /**
@@ -135,7 +164,7 @@ const mkUser = (role, name, email, phone, lang = "en", homeZip = null) => {
   return uid;
 };
 
-const adminId = mkUser("admin", "Ada Moreno", "admin@mealbridge.example", null);
+const adminId = mkUser("admin", "Ada Moreno", ADMIN_EMAIL, null);
 const seekerId = mkUser("seeker", "Sam Rivera", "sam@example.com", null, "en", "60615");
 mkUser("seeker", "Luz Delgado", null, "+13125550148", "es", "60616");
 
@@ -298,10 +327,10 @@ const counts = (
 
 console.log(`seeded: ${counts}`);
 console.log(`
-Demo sign-ins (codes print to the server console, nothing is sent):
+Demo sign-ins (no password, no code — see README "Authentication"):
   seeker    sam@example.com
   provider  60615.harvest-table@example.com   (approved)
   provider  60605.riverside-deli@example.com  (pending approval)
-  admin     admin@mealbridge.example
+  admin     ${ADMIN_EMAIL}
 `);
 console.log(`database: ${url}`);
