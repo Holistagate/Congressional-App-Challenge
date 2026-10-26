@@ -17,7 +17,7 @@ export default async function AdminLogPage() {
 
   const lang = await getLang(user.language);
 
-  const entries = all<{
+  const entries = await all<{
     id: string;
     action: string;
     target_type: string;

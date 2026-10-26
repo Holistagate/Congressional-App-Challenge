@@ -45,20 +45,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ---------------------------------------------------------------------------
--- One-time codes. We never store a password, so this table is the whole of
--- authentication. Codes are stored hashed: a leaked database should not let
--- anyone log in as a seeker.
+-- Sessions.
+--
+-- There is no password table and no one-time code table: sign-in trusts the
+-- address you type. See README "Authentication" for what that means and what
+-- to restore before this is used for anything beyond a demo.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS otp_codes (
-  id         TEXT PRIMARY KEY,
-  identifier TEXT NOT NULL,          -- normalised email or E.164 phone
-  code_hash  TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  attempts   INTEGER NOT NULL DEFAULT 0,
-  consumed_at INTEGER,
-  created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_otp_identifier ON otp_codes (identifier, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id         TEXT PRIMARY KEY,       -- stored as a hash of the cookie token

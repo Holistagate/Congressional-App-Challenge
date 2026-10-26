@@ -47,19 +47,19 @@ export async function callerKey(userId?: string | null): Promise<string> {
 
 export type LimitResult = { ok: true } | { ok: false; retryAfterSeconds: number };
 
-export function checkLimit(name: LimitName, key: string): LimitResult {
+export async function checkLimit(name: LimitName, key: string): Promise<LimitResult> {
   const rule = LIMITS[name];
   const bucket = `${name}:${key}`;
   const t = now();
   const windowStart = t - (t % rule.windowMs);
 
-  const row = get<{ window_start: number; count: number }>(
+  const row = await get<{ window_start: number; count: number }>(
     "SELECT window_start, count FROM rate_limits WHERE bucket = ?",
     [bucket],
   );
 
   if (!row || row.window_start !== windowStart) {
-    run(
+    await run(
       `INSERT INTO rate_limits (bucket, window_start, count) VALUES (?,?,1)
        ON CONFLICT (bucket) DO UPDATE SET window_start = excluded.window_start, count = 1`,
       [bucket, windowStart],
@@ -71,13 +71,13 @@ export function checkLimit(name: LimitName, key: string): LimitResult {
     return { ok: false, retryAfterSeconds: Math.ceil((windowStart + rule.windowMs - t) / 1000) };
   }
 
-  run("UPDATE rate_limits SET count = count + 1 WHERE bucket = ?", [bucket]);
+  await run("UPDATE rate_limits SET count = count + 1 WHERE bucket = ?", [bucket]);
   return { ok: true };
 }
 
 /** Convenience: resolve the key and check in one call. */
 export async function limit(name: LimitName, userId?: string | null): Promise<LimitResult> {
-  return checkLimit(name, await callerKey(userId));
+  return await checkLimit(name, await callerKey(userId));
 }
 
 /** "a few minutes" beats "retry after 847 seconds" for the person reading it. */

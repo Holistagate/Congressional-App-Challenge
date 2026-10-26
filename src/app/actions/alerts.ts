@@ -35,7 +35,7 @@ export async function saveAlert(_prev: AlertState, data: FormData): Promise<Aler
     return { error: "Check the highlighted fields", errors: fieldErrors(parsed.error) };
   }
 
-  if (!zipExists(parsed.data.zip)) {
+  if (!await zipExists(parsed.data.zip)) {
     return { error: "Check the highlighted fields", errors: { zip: "We don't recognise that ZIP code" } };
   }
 
@@ -43,7 +43,7 @@ export async function saveAlert(_prev: AlertState, data: FormData): Promise<Aler
 
   if (existingId) {
     // Scoped to the owner, so an id from somewhere else updates nothing.
-    run(
+    await run(
       `UPDATE alerts SET zip = ?, radius_miles = ?, dietary_filters = ?, channel = ?, active = ?
        WHERE id = ? AND seeker_id = ?`,
       [
@@ -57,7 +57,7 @@ export async function saveAlert(_prev: AlertState, data: FormData): Promise<Aler
       ],
     );
   } else {
-    run(
+    await run(
       `INSERT INTO alerts (id, seeker_id, zip, radius_miles, dietary_filters, channel, active, created_at)
        VALUES (?,?,?,?,?,?,?,?)`,
       [
@@ -82,7 +82,7 @@ export async function deleteAlert(_prev: AlertState, data: FormData): Promise<Al
   const id = String(data.get("alert_id") ?? "");
 
   // A real DELETE. Flagging the row inactive would leave the ZIP behind.
-  run("DELETE FROM alerts WHERE id = ? AND seeker_id = ?", [id, user.id]);
+  await run("DELETE FROM alerts WHERE id = ? AND seeker_id = ?", [id, user.id]);
 
   revalidatePath("/alerts");
   return { ok: true, message: "Alert deleted. Your ZIP code went with it." };

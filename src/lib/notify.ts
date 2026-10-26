@@ -91,9 +91,9 @@ export type QueuedNotification = {
   url?: string;
 };
 
-export function enqueue(n: QueuedNotification): string {
+export async function enqueue(n: QueuedNotification): Promise<string> {
   const id = newId("ntf");
-  run(
+  await run(
     "INSERT INTO notifications (id, user_id, listing_id, channel, title, body, url, created_at) VALUES (?,?,?,?,?,?,?,?)",
     [id, n.userId, n.listingId ?? null, n.channel, n.title, n.body, n.url ?? "/food", now()],
   );
@@ -107,7 +107,7 @@ export function enqueue(n: QueuedNotification): string {
  * scripts/worker.mjs on a schedule (so anything that failed gets another go).
  */
 export async function flushQueue(max = 100): Promise<{ sent: number; failed: number }> {
-  const pending = all<{
+  const pending = await all<{
     id: string;
     user_id: string;
     channel: string;
@@ -124,12 +124,12 @@ export async function flushQueue(max = 100): Promise<{ sent: number; failed: num
 
   for (const n of pending) {
     try {
-      const user = get<{ email: string | null; phone: string | null }>(
+      const user = await get<{ email: string | null; phone: string | null }>(
         "SELECT email, phone FROM users WHERE id = ?",
         [n.user_id],
       );
       if (!user) {
-        run("UPDATE notifications SET sent_at = ?, error = ? WHERE id = ?", [now(), "no such user", n.id]);
+        await run("UPDATE notifications SET sent_at = ?, error = ? WHERE id = ?", [now(), "no such user", n.id]);
         continue;
       }
 
@@ -143,10 +143,10 @@ export async function flushQueue(max = 100): Promise<{ sent: number; failed: num
         await deliver({ channel: "sms", to: user.phone, body: `${n.title} — ${n.body}` });
       }
 
-      run("UPDATE notifications SET sent_at = ? WHERE id = ?", [now(), n.id]);
+      await run("UPDATE notifications SET sent_at = ? WHERE id = ?", [now(), n.id]);
       sent++;
     } catch (err) {
-      run("UPDATE notifications SET error = ? WHERE id = ?", [String(err).slice(0, 500), n.id]);
+      await run("UPDATE notifications SET error = ? WHERE id = ?", [String(err).slice(0, 500), n.id]);
       failed++;
     }
   }
@@ -165,7 +165,7 @@ export async function flushQueue(max = 100): Promise<{ sent: number; failed: num
  * see README "Notifications".
  */
 async function sendPushToUser(userId: string, title: string, body: string, url: string): Promise<void> {
-  const subs = all<{ endpoint: string }>("SELECT endpoint FROM push_subscriptions WHERE user_id = ?", [
+  const subs = await all<{ endpoint: string }>("SELECT endpoint FROM push_subscriptions WHERE user_id = ?", [
     userId,
   ]);
 
@@ -178,7 +178,7 @@ async function sendPushToUser(userId: string, title: string, body: string, url: 
     const res = await fetch(s.endpoint, { method: "POST", headers: { TTL: "3600" } });
     // 404/410 mean the browser threw the subscription away; stop writing to it.
     if (res.status === 404 || res.status === 410) {
-      run("DELETE FROM push_subscriptions WHERE endpoint = ?", [s.endpoint]);
+      await run("DELETE FROM push_subscriptions WHERE endpoint = ?", [s.endpoint]);
     }
   }
 }
@@ -201,12 +201,12 @@ export async function notifyMatchingSeekers(listing: {
   dietary_tags: string;
   portions_remaining: number;
 }): Promise<number> {
-  const matches = matchAlertsForListing(listing.zip, parseJsonArray(listing.dietary_tags));
+  const matches = await matchAlertsForListing(listing.zip, parseJsonArray(listing.dietary_tags));
 
   for (const m of matches) {
     const es = m.language === "es";
     const miles = m.distance_miles < 0.1 ? null : m.distance_miles.toFixed(1);
-    enqueue({
+    await enqueue({
       userId: m.seeker_id,
       listingId: listing.id,
       channel: m.channel === "both" ? "sms" : m.channel,
@@ -222,13 +222,13 @@ export async function notifyMatchingSeekers(listing: {
 }
 
 /** Tells everyone who saved a listing that it changed. */
-export function notifySavers(
+export async function notifySavers(
   listingId: string,
   title: string,
   body: string,
   exceptUserId?: string,
-): number {
-  const savers = all<{ seeker_id: string }>(
+): Promise<number> {
+  const savers = await all<{ seeker_id: string }>(
     "SELECT seeker_id FROM saved_listings WHERE listing_id = ?",
     [listingId],
   );
@@ -236,7 +236,7 @@ export function notifySavers(
   let count = 0;
   for (const s of savers) {
     if (s.seeker_id === exceptUserId) continue;
-    enqueue({ userId: s.seeker_id, listingId, channel: "push", title, body, url: `/food/${listingId}` });
+    await enqueue({ userId: s.seeker_id, listingId, channel: "push", title, body, url: `/food/${listingId}` });
     count++;
   }
   return count;

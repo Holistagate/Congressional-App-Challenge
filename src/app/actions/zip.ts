@@ -17,7 +17,7 @@ import { ZIP_COOKIE } from "@/lib/cookies";
 export async function setZip(_prev: { error?: string } | undefined, data: FormData) {
   const zip = normalizeZip(String(data.get("zip") ?? ""));
   if (!zip) return { error: "Enter a 5-digit ZIP code" };
-  if (!zipExists(zip)) return { error: "We don't recognise that ZIP code. Check the five digits." };
+  if (!await zipExists(zip)) return { error: "We don't recognise that ZIP code. Check the five digits." };
 
   const jar = await cookies();
   jar.set(ZIP_COOKIE, zip, {

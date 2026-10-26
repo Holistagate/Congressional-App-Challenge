@@ -8,7 +8,7 @@ import { useTestDatabase, cleanupTestDatabase, seed } from "./helpers.ts";
  * The database has to exist before the app's db module is imported, because
  * that module opens a connection at import time from DATABASE_PATH.
  */
-const dbPath = useTestDatabase();
+const url = await useTestDatabase();
 
 const { listNearby, lookupZip } = await import("../src/db/queries.ts");
 
@@ -18,10 +18,9 @@ const MIN = 60 * 1000;
 describe("listNearby", () => {
   let now: number;
 
-  before(() => {
+  before(async () => {
     now = Date.now();
-    seed(
-      dbPath,
+    (await seed(url,
       [
         // Same ZIP as the seeker.
         { id: "l_same", zip: "60615", description: "Same ZIP" },
@@ -35,56 +34,57 @@ describe("listNearby", () => {
         { id: "l_la", zip: "90012", description: "Los Angeles" },
       ],
       now,
-    ).close();
+    )).close();
   });
 
-  const origin = () => lookupZip("60615")!;
+  const origin = async () => (await lookupZip("60615"))!;
 
-  function ids(opts: Partial<Parameters<typeof listNearby>[0]> = {}) {
-    const o = origin();
-    return listNearby({
+  async function ids(opts: Partial<Parameters<typeof listNearby>[0]> = {}) {
+    const o = await origin();
+    return (await listNearby({
       lat: o.lat,
       lng: o.lng,
       zip: "60615",
       radiusMiles: 25,
       at: now,
       ...opts,
-    }).map((l) => l.id);
+    })).map((l) => l.id);
   }
 
-  test("puts the seeker's own ZIP first", () => {
-    assert.equal(ids()[0], "l_same");
+  test("puts the seeker's own ZIP first", async () => {
+    assert.equal((await ids())[0], "l_same");
   });
 
-  test("orders the rest by increasing distance", () => {
-    assert.deepEqual(ids(), ["l_same", "l_near", "l_mid", "l_far"]);
+  test("orders the rest by increasing distance", async () => {
+    assert.deepEqual(await ids(), ["l_same", "l_near", "l_mid", "l_far"]);
   });
 
-  test("excludes anything beyond the chosen radius", () => {
-    assert.deepEqual(ids({ radiusMiles: 5 }), ["l_same", "l_near", "l_mid", "l_far"]);
+  test("excludes anything beyond the chosen radius", async () => {
+    assert.deepEqual(await ids({ radiusMiles: 5 }), ["l_same", "l_near", "l_mid", "l_far"]);
 
     // Los Angeles is ~1740 miles away and must never appear, at any radius
     // the UI offers.
-    assert.ok(!ids({ radiusMiles: 25 }).includes("l_la"));
+    assert.ok(!(await ids({ radiusMiles: 25 })).includes("l_la"));
   });
 
-  test("a tighter radius drops the furthest listings", () => {
-    const within2 = listNearby({
-      lat: origin().lat,
-      lng: origin().lng,
+  test("a tighter radius drops the furthest listings", async () => {
+    const o = await origin();
+    const within2 = (await listNearby({
+      lat: o.lat,
+      lng: o.lng,
       zip: "60615",
       radiusMiles: 2,
       at: now,
-    }).map((l) => l.id);
+    })).map((l) => l.id);
 
     assert.ok(within2.includes("l_same"));
     assert.ok(within2.includes("l_near"));
     assert.ok(!within2.includes("l_far"), "Chinatown is ~3.6 miles and should be excluded at 2");
   });
 
-  test("reports a distance that agrees with the ordering", () => {
-    const o = origin();
-    const rows = listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
+  test("reports a distance that agrees with the ordering", async () => {
+    const o = await origin();
+    const rows = await listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
 
     for (let i = 1; i < rows.length; i++) {
       // Same-ZIP rows sort ahead regardless, so only compare within the rest.
@@ -97,9 +97,9 @@ describe("listNearby", () => {
     }
   });
 
-  test("flags same_zip on exactly the matching listing", () => {
-    const o = origin();
-    const rows = listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
+  test("flags same_zip on exactly the matching listing", async () => {
+    const o = await origin();
+    const rows = await listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
     const flagged = rows.filter((r) => r.same_zip === 1).map((r) => r.id);
     assert.deepEqual(flagged, ["l_same"]);
   });
@@ -108,10 +108,9 @@ describe("listNearby", () => {
 describe("listNearby tie-breaking", () => {
   let now: number;
 
-  before(() => {
+  before(async () => {
     now = Date.now();
-    seed(
-      dbPath,
+    (await seed(url,
       [
         // Three listings in one ZIP, so distance cannot separate them and the
         // closing time has to.
@@ -120,12 +119,12 @@ describe("listNearby tie-breaking", () => {
         { id: "t_second", zip: "60653", endOffsetMs: 3 * HOUR },
       ],
       now,
-    ).close();
+    )).close();
   });
 
-  test("at equal distance, the window closing soonest comes first", () => {
-    const o = lookupZip("60615")!;
-    const rows = listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
+  test("at equal distance, the window closing soonest comes first", async () => {
+    const o = (await lookupZip("60615"))!;
+    const rows = await listNearby({ lat: o.lat, lng: o.lng, zip: "60615", radiusMiles: 25, at: now });
     assert.deepEqual(
       rows.map((r) => r.id),
       ["t_first", "t_second", "t_last"],
@@ -136,10 +135,9 @@ describe("listNearby tie-breaking", () => {
 describe("listNearby filters", () => {
   let now: number;
 
-  before(() => {
+  before(async () => {
     now = Date.now();
-    seed(
-      dbPath,
+    (await seed(url,
       [
         { id: "f_veg", zip: "60615", dietary: ["vegetarian"] },
         { id: "f_vegan_halal", zip: "60615", dietary: ["vegan", "halal"] },
@@ -150,48 +148,48 @@ describe("listNearby filters", () => {
         { id: "f_ended", zip: "60615", startOffsetMs: -5 * HOUR, endOffsetMs: -1 * HOUR },
       ],
       now,
-    ).close();
+    )).close();
   });
 
 
-  const run = (opts: Record<string, unknown> = {}) => {
-    const o = lookupZip("60615")!;
-    return listNearby({
+  const run = async (opts: Record<string, unknown> = {}) => {
+    const o = (await lookupZip("60615"))!;
+    return (await listNearby({
       lat: o.lat,
       lng: o.lng,
       zip: "60615",
       radiusMiles: 25,
       at: now,
       ...opts,
-    }).map((l) => l.id);
+    })).map((l) => l.id);
   };
 
-  test("hides listings with nothing left", () => {
-    assert.ok(!run().includes("f_empty"));
+  test("hides listings with nothing left", async () => {
+    assert.ok(!(await run()).includes("f_empty"));
   });
 
-  test("hides cancelled and finished listings", () => {
-    const got = run();
+  test("hides cancelled and finished listings", async () => {
+    const got = await run();
     assert.ok(!got.includes("f_cancelled"));
     assert.ok(!got.includes("f_ended"));
   });
 
-  test("dietary filters require every need to be met, not just one", () => {
+  test("dietary filters require every need to be met, not just one", async () => {
     // Asking for vegan AND halal must not match a listing that is only vegan.
-    const both = run({ dietary: ["vegan", "halal"] });
+    const both = await run({ dietary: ["vegan", "halal"] });
     assert.deepEqual(both, ["f_vegan_halal"]);
 
-    const vegetarian = run({ dietary: ["vegetarian"] });
+    const vegetarian = await run({ dietary: ["vegetarian"] });
     assert.deepEqual(vegetarian, ["f_veg"]);
   });
 
-  test("'available now' excludes a window that has not opened", () => {
-    assert.ok(!run({ when: "now" }).includes("f_later"));
-    assert.ok(run().includes("f_later"), "it should still appear with no time filter");
+  test("'available now' excludes a window that has not opened", async () => {
+    assert.ok(!(await run({ when: "now" })).includes("f_later"));
+    assert.ok((await run()).includes("f_later"), "it should still appear with no time filter");
   });
 
-  test("'later today' shows only windows that have not opened", () => {
-    assert.deepEqual(run({ when: "later" }), ["f_later"]);
+  test("'later today' shows only windows that have not opened", async () => {
+    assert.deepEqual(await run({ when: "later" }), ["f_later"]);
   });
 });
 

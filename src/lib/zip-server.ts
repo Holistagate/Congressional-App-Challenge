@@ -17,5 +17,5 @@ import { ZIP_COOKIE } from "./cookies";
 export async function readZip(): Promise<string | null> {
   const raw = (await cookies()).get(ZIP_COOKIE)?.value;
   const zip = raw ? normalizeZip(raw) : null;
-  return zip && zipExists(zip) ? zip : null;
+  return zip && await zipExists(zip) ? zip : null;
 }

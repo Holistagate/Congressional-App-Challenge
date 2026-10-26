@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { registerProvider, submitCode, type FormState } from "@/app/actions/auth";
+import { registerProvider, type FormState } from "@/app/actions/auth";
 import { translator, type Lang } from "@/lib/i18n";
 
 /**
@@ -16,38 +16,6 @@ import { translator, type Lang } from "@/lib/i18n";
 export function ProviderSignupForm({ lang }: { lang: Lang }) {
   const t = translator(lang);
   const [state, action, pending] = useActionState<FormState, FormData>(registerProvider, {});
-  const [verify, verifyAction, verifying] = useActionState<FormState, FormData>(submitCode, {});
-
-  if (state.ok) {
-    return (
-      <form action={verifyAction}>
-        <p className="measure">{t("auth.codeSent", { masked: state.masked ?? "" })}</p>
-
-        <label className="label mt-5" htmlFor="code">
-          {t("auth.code")}
-        </label>
-        <input
-          id="code"
-          name="code"
-          className="field tnum max-w-[12rem] text-2xl tracking-[0.3em]"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          required
-          autoFocus
-          aria-invalid={verify.error ? true : undefined}
-        />
-        {verify.error && (
-          <p className="error-text mt-2" role="alert">
-            {verify.error}
-          </p>
-        )}
-        <button type="submit" className="btn btn-primary mt-5" disabled={verifying}>
-          {verifying ? t("common.loading") : t("auth.verify")}
-        </button>
-      </form>
-    );
-  }
 
   const err = (field: string) => state.errors?.[field];
   const v = (field: string) => state.values?.[field];

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unrecognised push service" }, { status: 400 });
   }
 
-  run(
+  await run(
     `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
      VALUES (?,?,?,?,?,?)
      ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id,
@@ -63,6 +63,6 @@ export async function DELETE(request: Request) {
   const endpoint = searchParams.get("endpoint");
   if (!endpoint) return NextResponse.json({ error: "Missing endpoint" }, { status: 400 });
 
-  run("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?", [endpoint, user.id]);
+  await run("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?", [endpoint, user.id]);
   return NextResponse.json({ ok: true });
 }

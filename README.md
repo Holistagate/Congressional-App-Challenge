@@ -146,6 +146,24 @@ The product promise is that **looking for free food should never create a record
 - One-time codes are stored hashed, expire in 10 minutes, and lock out after 5 wrong attempts.
 - No analytics, no trackers, no third-party embeds.
 
+### Authentication
+
+**Sign-in trusts the address you type.** There is no password and no emailed
+code: you enter an email or phone number and you are signed in, creating the
+account if it is new.
+
+That is a deliberate trade and it is worth being plain about. For a seeker it
+is close to harmless — the account holds a ZIP code and a few saved listings,
+and the alternative is a step that loses people who are trying to find dinner
+on a borrowed phone. For an approved provider or an admin it is **not**
+acceptable in production: anyone who knows the address is in.
+
+The one-time code flow this replaced is in the git history (`issueCode` and
+`verifyCode` in `src/lib/auth.ts`). Restoring it means putting those back,
+re-adding the two-step form, and setting `RESEND_API_KEY` or the Twilio
+variables so the code can actually be delivered — without a provider
+configured the code only ever reached the server log, which is why it is gone.
+
 ### Authorisation
 
 Every server action re-checks authentication and ownership — `requireApprovedProvider()`, `requireOwnedListing()`, `requireRole()` in `src/lib/session.ts`. Server Actions are reachable by direct POST, so a hidden button is never a control.
@@ -207,28 +225,64 @@ then replace the body of `sendPushToUser` with a `webpush.sendNotification()` ca
 
 ---
 
-## Deploying
+## Deploying to Vercel
 
-The app runs anywhere Node 22.5+ does.
+The app needs a database that survives a cold start. Vercel's filesystem does
+not, so a SQLite file there is empty on the first request and gone again after
+— that is the whole of "the database fails on Vercel". [Turso](https://turso.tech)
+is SQLite over the network, so the schema, the SQL and the ZIP table all carry
+across unchanged.
+
+**1. Create the database**
 
 ```bash
-npm run build && npm start
+turso db create mealbridge
+turso db show mealbridge --url      # libsql://mealbridge-you.turso.io
+turso db tokens create mealbridge   # the auth token
 ```
 
-**On a platform with a persistent disk** (Railway, Render, Fly, a VPS): set `DATABASE_PATH` to a mounted volume and you're done.
+**2. Load the schema and the 41,637 ZIP centroids into it**, once, from your
+machine:
 
-**On Vercel or any serverless host**, the filesystem is ephemeral — a SQLite file won't survive. Switch to Postgres first (below), or use [Turso](https://turso.tech), which speaks SQLite over the network and needs only a driver swap in `src/db/index.ts`.
+```bash
+TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... npm run db:setup
+```
 
-### Moving to Postgres
+It sends the ZIP table in batches of a thousand and prints its progress; it
+takes a minute or two. Add `--no-seed` to skip the demo restaurants and start
+with an empty, real database.
 
-1. `npm install pg` and replace the driver in `src/db/index.ts`. The `all` / `get` / `run` / `tx` helpers are the only surface the rest of the app touches.
-2. Change `?` placeholders to `$1, $2, …`, and `MIN(a, b)` to `LEAST(a, b)` in `DISTANCE_SQL`.
-3. `INTEGER` timestamps become `BIGINT`; `TEXT` JSON columns can become `JSONB`.
-4. Move the checks in `src/lib/session.ts` into RLS policies.
+**3. Set the environment variables in Vercel** (Project → Settings →
+Environment Variables):
 
-The Haversine SQL is standard and works unchanged. PostGIS is not needed.
+| Variable | Value |
+| --- | --- |
+| `TURSO_DATABASE_URL` | `libsql://…` from step 1 |
+| `TURSO_AUTH_TOKEN` | the token from step 1 |
+| `CRON_SECRET` | any random string — `/api/cron` refuses to run in production without it |
 
----
+**4. Deploy.** `vercel.json` already schedules `/api/cron` every five minutes
+to expire listings, post recurring rules and flush the notification queue.
+
+Nothing else needs changing: the app reads `TURSO_DATABASE_URL` if it is set
+and falls back to a local file if it is not, so the same code runs in both
+places.
+
+### Running it anywhere else
+
+On a platform with a persistent disk (Railway, Render, Fly, a VPS), leave the
+Turso variables unset and point `TURSO_DATABASE_URL` at a file on a mounted
+volume — `file:/data/mealbridge.db`. The driver takes either.
+
+### A note on the local database
+
+The development database lives in `node_modules/.cache/mealbridge/dev.db`,
+not in the project tree. SQLite rewrites its `-wal` and `-shm` files on every
+read, Next's watcher has no ignore list, and a database beside the source puts
+the dev server in a loop: a page load writes the WAL, the watcher fires, Fast
+Refresh reloads the page, which loads again. Watchers skip `node_modules`,
+which ends it. `npm run db:setup` rebuilds it in seconds if it is ever wiped.
+
 
 ## Onboarding your first restaurants
 

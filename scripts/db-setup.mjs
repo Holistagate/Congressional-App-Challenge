@@ -10,7 +10,7 @@
  * Standalone on purpose: no imports from src/, so setup works before anything
  * is built and cannot be broken by an app-side refactor.
  */
-import { DatabaseSync } from "node:sqlite";
+import { createClient } from "@libsql/client";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,46 +18,48 @@ import { randomUUID } from "node:crypto";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = new Set(process.argv.slice(2));
-const dbPath = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.join(root, "data", "mealbridge.db");
+// Kept out of the project tree: SQLite rewrites its -wal/-shm files on every
+// read, and Next's watcher has no ignore list, so a database beside the source
+// puts the dev server in a reload loop. Mirrored in src/db/index.ts.
+const localDir = path.join(root, "node_modules", ".cache", "mealbridge");
+const url = process.env.TURSO_DATABASE_URL ?? `file:${path.join(localDir, "dev.db")}`;
+const remote = !url.startsWith("file:");
 
-mkdirSync(path.dirname(dbPath), { recursive: true });
+if (!remote) mkdirSync(localDir, { recursive: true });
 
-const db = new DatabaseSync(dbPath);
-db.exec("PRAGMA journal_mode = WAL");
-db.exec("PRAGMA foreign_keys = ON");
+const db = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+
+console.log(remote ? `target: ${url.replace(/\/\/.*@/, "//")}` : `target: ${url}`);
 
 /**
- * --reset drops every table rather than deleting the file.
+ * --reset drops every table rather than deleting a file.
  *
- * On Windows a running `npm run dev` holds an open handle to the database, and
- * unlinking it fails with EPERM — which is a baffling error to hit halfway
- * through setting the project up. Dropping tables through a connection works
- * whether or not the dev server is running.
+ * It has to work against Turso, where there is no file to delete, and on
+ * Windows, where a running `next dev` holds the local one open and unlinking
+ * it fails with a baffling EPERM halfway through setup.
  */
 if (args.has("--reset")) {
-  const tables = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-    .all()
-    .map((r) => r.name);
+  const { rows } = await db.execute(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+  );
+  const tables = rows.map((r) => r.name);
 
-  db.exec("PRAGMA foreign_keys = OFF");
-  for (const name of tables) db.exec(`DROP TABLE IF EXISTS "${name}"`);
-  db.exec("PRAGMA foreign_keys = ON");
+  await db.execute("PRAGMA foreign_keys = OFF");
+  for (const name of tables) await db.execute(`DROP TABLE IF EXISTS "${name}"`);
+  await db.execute("PRAGMA foreign_keys = ON");
 
   console.log(`reset: dropped ${tables.length} tables`);
 }
 
 /* ------------------------------------------------------------- migrate --- */
 
-db.exec(readFileSync(path.join(root, "src", "db", "schema.sql"), "utf8"));
+await db.executeMultiple(readFileSync(path.join(root, "src", "db", "schema.sql"), "utf8"));
 console.log("schema applied");
 
 /* ----------------------------------------------------------------- zips --- */
 
-const zipCount = db.prepare("SELECT COUNT(*) AS n FROM zip_codes").get().n;
-if (zipCount === 0) {
+const zipCount = (await db.execute("SELECT COUNT(*) AS n FROM zip_codes")).rows[0].n;
+if (Number(zipCount) === 0) {
   const csvPath = path.join(root, "data", "zip-centroids.csv");
   if (!existsSync(csvPath)) {
     console.error(`Missing ${csvPath}. See scripts/build-zip-table.mjs.`);
@@ -65,25 +67,35 @@ if (zipCount === 0) {
   }
 
   const lines = readFileSync(csvPath, "utf8").split("\n");
-  const insert = db.prepare(
-    "INSERT OR REPLACE INTO zip_codes (zip, city, state, lat, lng) VALUES (?, ?, ?, ?, ?)",
-  );
-
-  db.exec("BEGIN");
-  let loaded = 0;
+  const statements = [];
   for (const line of lines.slice(1)) {
     if (!line.trim()) continue;
     // City may be quoted because a few contain commas.
     const m = line.match(/^(\d{5}),("(?:[^"]|"")*"|[^,]*),([^,]*),([^,]*),([^,]*)$/);
     if (!m) continue;
     const city = m[2].startsWith('"') ? m[2].slice(1, -1).replace(/""/g, '"') : m[2];
-    insert.run(m[1], city, m[3], Number(m[4]), Number(m[5]));
-    loaded++;
+    statements.push({
+      sql: "INSERT OR REPLACE INTO zip_codes (zip, city, state, lat, lng) VALUES (?, ?, ?, ?, ?)",
+      args: [m[1], city, m[3], Number(m[4]), Number(m[5])],
+    });
   }
-  db.exec("COMMIT");
-  console.log(`zip_codes: loaded ${loaded.toLocaleString()} centroids`);
+
+  // Sent in chunks. One statement per row would be 41,637 round trips to
+  // Turso; one batch of 41,637 would be a request far past what it accepts.
+  // A thousand at a time takes well under a minute and stays inside both.
+  const CHUNK = 1000;
+  for (let i = 0; i < statements.length; i += CHUNK) {
+    await db.batch(statements.slice(i, i + CHUNK), "write");
+    if (remote) {
+      const done = Math.min(i + CHUNK, statements.length);
+      process.stdout.write(`
+  zip_codes: ${done.toLocaleString()} / ${statements.length.toLocaleString()}`);
+    }
+  }
+  if (remote) process.stdout.write("\n");
+  console.log(`zip_codes: loaded ${statements.length.toLocaleString()} centroids`);
 } else {
-  console.log(`zip_codes: ${zipCount.toLocaleString()} already present, skipping`);
+  console.log(`zip_codes: ${Number(zipCount).toLocaleString()} already present, skipping`);
 }
 
 /* ----------------------------------------------------------------- seed --- */
@@ -93,7 +105,7 @@ if (args.has("--no-seed")) {
   process.exit(0);
 }
 
-if (db.prepare("SELECT COUNT(*) AS n FROM users").get().n > 0) {
+if (Number((await db.execute("SELECT COUNT(*) AS n FROM users")).rows[0].n) > 0) {
   console.log("seed: users already exist, skipping. Use --reset to rebuild.");
   process.exit(0);
 }
@@ -112,13 +124,14 @@ function at(hour, minute = 0, dayOffset = 0) {
 /** Minutes from now, for windows that should always be live during a demo. */
 const inMin = (m) => now + m * 60000;
 
-db.exec("BEGIN");
+const seedStatements = [];
 
 const mkUser = (role, name, email, phone, lang = "en", homeZip = null) => {
   const uid = id("usr");
-  db.prepare(
-    "INSERT INTO users (id, role, name, email, phone, language, created_at, home_zip) VALUES (?,?,?,?,?,?,?,?)",
-  ).run(uid, role, name, email, phone, lang, now, homeZip);
+  seedStatements.push({
+    sql: "INSERT INTO users (id, role, name, email, phone, language, created_at, home_zip) VALUES (?,?,?,?,?,?,?,?)",
+    args: [uid, role, name, email, phone, lang, now, homeZip],
+  });
   return uid;
 };
 
@@ -129,16 +142,19 @@ mkUser("seeker", "Luz Delgado", null, "+13125550148", "es", "60616");
 const mkProvider = (biz, street, city, state, zip, phone, status, showPhone) => {
   const uid = mkUser("provider", `${biz} manager`, `${zip}.${slug(biz)}@example.com`, null);
   const pid = id("prv");
-  db.prepare(
-    `INSERT INTO providers (id, user_id, business_name, street, city, state, zip,
-       contact_name, phone, email, permit_number, status, show_phone, show_interest,
-       created_at, reviewed_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
-  ).run(
-    pid, uid, biz, street, city, state, zip,
-    "Manager", phone, `${zip}.${slug(biz)}@example.com`, `FP-${zip}-${Math.floor(Math.random() * 900 + 100)}`,
-    status, showPhone, now - 86400000 * 14, status === "pending" ? null : now - 86400000 * 13,
-  );
+  seedStatements.push({
+    sql: `INSERT INTO providers (id, user_id, business_name, street, city, state, zip,
+            contact_name, phone, email, permit_number, status, show_phone, show_interest,
+            created_at, reviewed_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+    args: [
+      pid, uid, biz, street, city, state, zip,
+      "Manager", phone, `${zip}.${slug(biz)}@example.com`,
+      `FP-${zip}-${Math.floor(Math.random() * 900 + 100)}`,
+      status, showPhone, now - 86400000 * 14,
+      status === "pending" ? null : now - 86400000 * 13,
+    ],
+  });
   return pid;
 };
 
@@ -157,19 +173,20 @@ mkProvider("Riverside Deli", "711 S Dearborn St", "Chicago", "IL", "60605", "+13
 
 const mkListing = (providerId, o) => {
   const lid = id("lst");
-  db.prepare(
-    `INSERT INTO listings (id, provider_id, description, categories, dietary_tags, allergen_tags,
-       portions_total, portions_remaining, street, city, state, zip,
-       pickup_start, pickup_end, notes, photo_url, status, safety_ack_at, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  ).run(
-    lid, providerId, o.description,
-    JSON.stringify(o.categories ?? []), JSON.stringify(o.dietary ?? []), JSON.stringify(o.allergens ?? []),
-    o.total, o.remaining ?? o.total,
-    o.street, o.city ?? "Chicago", o.state ?? "IL", o.zip,
-    o.start, o.end, o.notes ?? "", null, o.status ?? "active",
-    now, now - 3600000, now,
-  );
+  seedStatements.push({
+    sql: `INSERT INTO listings (id, provider_id, description, categories, dietary_tags, allergen_tags,
+            portions_total, portions_remaining, street, city, state, zip,
+            pickup_start, pickup_end, notes, photo_url, status, safety_ack_at, created_at, updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    args: [
+      lid, providerId, o.description,
+      JSON.stringify(o.categories ?? []), JSON.stringify(o.dietary ?? []), JSON.stringify(o.allergens ?? []),
+      o.total, o.remaining ?? o.total,
+      o.street, o.city ?? "Chicago", o.state ?? "IL", o.zip,
+      o.start, o.end, o.notes ?? "", null, o.status ?? "active",
+      now, now - 3600000, now,
+    ],
+  });
   return lid;
 };
 
@@ -214,20 +231,29 @@ mkListing(harvest, {
 });
 
 // A seeker with a standing alert, so the matching path has something to match.
-db.prepare(
-  "INSERT INTO alerts (id, seeker_id, zip, radius_miles, dietary_filters, channel, active, created_at) VALUES (?,?,?,?,?,?,1,?)",
-).run(id("alr"), seekerId, "60615", 10, JSON.stringify([]), "push", now);
+seedStatements.push({
+  sql: "INSERT INTO alerts (id, seeker_id, zip, radius_miles, dietary_filters, channel, active, created_at) VALUES (?,?,?,?,?,?,1,?)",
+  args: [id("alr"), seekerId, "60615", 10, JSON.stringify([]), "push", now],
+});
 
 // One open report, so the admin queue is not empty on first load.
-db.prepare(
-  "INSERT INTO reports (id, listing_id, reporter_id, reason, details, status, created_at) VALUES (?,?,?,?,?,'open',?)",
-).run(id("rpt"), liveA, seekerId, "wrong_info", "The side door was locked when I got there.", now - 1800000);
+seedStatements.push({
+  sql: "INSERT INTO reports (id, listing_id, reporter_id, reason, details, status, created_at) VALUES (?,?,?,?,?,'open',?)",
+  args: [id("rpt"), liveA, seekerId, "wrong_info", "The side door was locked when I got there.", now - 1800000],
+});
 
-db.exec("COMMIT");
+// One batch: users, providers and listings reference each other, so they
+// land together or not at all.
+await db.batch(seedStatements, "write");
 
-const counts = ["users", "providers", "listings", "alerts", "reports"]
-  .map((t) => `${t}=${db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n}`)
-  .join("  ");
+const counts = (
+  await Promise.all(
+    ["users", "providers", "listings", "alerts", "reports"].map(async (t) => {
+      const { rows } = await db.execute(`SELECT COUNT(*) AS n FROM ${t}`);
+      return `${t}=${rows[0].n}`;
+    }),
+  )
+).join("  ");
 
 console.log(`seeded: ${counts}`);
 console.log(`
@@ -237,4 +263,4 @@ Demo sign-ins (codes print to the server console, nothing is sent):
   provider  60605.riverside-deli@example.com  (pending approval)
   admin     admin@mealbridge.example
 `);
-console.log(`database: ${dbPath}`);
+console.log(`database: ${url}`);

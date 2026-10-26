@@ -20,7 +20,7 @@ export async function setLanguage(lang: Lang): Promise<void> {
   // Signed-in people get it remembered on the account too, so it follows them
   // to a new device and so notifications go out in the right language.
   const user = await currentUser();
-  if (user) run("UPDATE users SET language = ? WHERE id = ?", [lang, user.id]);
+  if (user) await run("UPDATE users SET language = ? WHERE id = ?", [lang, user.id]);
 
   revalidatePath("/", "layout");
 }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { get, run, tx, newId, now } from "@/db/index";
+import { get, run, newId, now } from "@/db/index";
 import { currentUser, requireUser, requireApprovedProvider, requireOwnedListing, AuthError } from "@/lib/session";
 import { limit, retryMessage } from "@/lib/ratelimit";
 import { listingSchema, reportSchema, portionsUpdateSchema, fieldErrors, formList } from "@/lib/validation";
@@ -56,7 +56,7 @@ export async function postListing(_prev: ActionState, data: FormData): Promise<A
     return { error: "Check the highlighted fields", errors: fieldErrors(parsed.error) };
   }
 
-  if (!zipExists(parsed.data.zip)) {
+  if (!await zipExists(parsed.data.zip)) {
     return {
       error: "Check the highlighted fields",
       errors: { zip: "We don't recognise that ZIP code" },
@@ -66,34 +66,32 @@ export async function postListing(_prev: ActionState, data: FormData): Promise<A
   const id = newId("lst");
   const v = parsed.data;
 
-  tx(() => {
-    run(
-      `INSERT INTO listings (id, provider_id, description, categories, dietary_tags, allergen_tags,
-         portions_total, portions_remaining, street, city, state, zip,
-         pickup_start, pickup_end, notes, photo_url, status, safety_ack_at, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,'active',?,?,?)`,
-      [
-        id,
-        provider.id,
-        v.description,
-        JSON.stringify(v.categories),
-        JSON.stringify(v.dietary_tags),
-        JSON.stringify(v.allergen_tags),
-        v.portions,
-        v.portions,
-        v.street,
-        v.city,
-        v.state,
-        v.zip,
-        v.pickup_start,
-        v.pickup_end,
-        v.notes,
-        now(),
-        now(),
-        now(),
-      ],
-    );
-  });
+  await run(
+    `INSERT INTO listings (id, provider_id, description, categories, dietary_tags, allergen_tags,
+       portions_total, portions_remaining, street, city, state, zip,
+       pickup_start, pickup_end, notes, photo_url, status, safety_ack_at, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,'active',?,?,?)`,
+    [
+      id,
+      provider.id,
+      v.description,
+      JSON.stringify(v.categories),
+      JSON.stringify(v.dietary_tags),
+      JSON.stringify(v.allergen_tags),
+      v.portions,
+      v.portions,
+      v.street,
+      v.city,
+      v.state,
+      v.zip,
+      v.pickup_start,
+      v.pickup_end,
+      v.notes,
+      now(),
+      now(),
+      now(),
+    ],
+  );
 
   const notified = await notifyMatchingSeekers({
     id,
@@ -142,7 +140,7 @@ export async function updatePortions(_prev: ActionState, data: FormData): Promis
     return { error: err instanceof AuthError ? err.message : "You can't change that" };
   }
 
-  const listing = get<{ portions_total: number; portions_remaining: number }>(
+  const listing = await get<{ portions_total: number; portions_remaining: number }>(
     "SELECT portions_total, portions_remaining FROM listings WHERE id = ?",
     [parsed.data.listing_id],
   );
@@ -151,7 +149,7 @@ export async function updatePortions(_prev: ActionState, data: FormData): Promis
   const remaining = Math.min(parsed.data.remaining, listing.portions_total);
   const nowGone = remaining <= 0;
 
-  run("UPDATE listings SET portions_remaining = ?, status = ?, updated_at = ? WHERE id = ?", [
+  await run("UPDATE listings SET portions_remaining = ?, status = ?, updated_at = ? WHERE id = ?", [
     remaining,
     nowGone ? "gone" : "active",
     now(),
@@ -159,7 +157,7 @@ export async function updatePortions(_prev: ActionState, data: FormData): Promis
   ]);
 
   if (nowGone) {
-    notifySavers(
+    await notifySavers(
       parsed.data.listing_id,
       "That food has gone",
       "The portions you saved have all been collected.",
@@ -181,9 +179,9 @@ export async function cancelListing(_prev: ActionState, data: FormData): Promise
     return { error: err instanceof AuthError ? err.message : "You can't change that" };
   }
 
-  run("UPDATE listings SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), id]);
+  await run("UPDATE listings SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), id]);
 
-  notifySavers(id, "A pickup was cancelled", "Food you saved is no longer available.");
+  await notifySavers(id, "A pickup was cancelled", "Food you saved is no longer available.");
   await flushQueue();
 
   revalidatePath("/provider");
@@ -202,19 +200,19 @@ export async function toggleSave(_prev: ActionState, data: FormData): Promise<Ac
   }
 
   const listingId = String(data.get("listing_id") ?? "");
-  if (!get("SELECT 1 AS ok FROM listings WHERE id = ?", [listingId])) {
+  if (!await get("SELECT 1 AS ok FROM listings WHERE id = ?", [listingId])) {
     return { error: "That listing is gone" };
   }
 
-  const existing = get("SELECT 1 AS ok FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [
+  const existing = await get("SELECT 1 AS ok FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [
     user.id,
     listingId,
   ]);
 
   if (existing) {
-    run("DELETE FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [user.id, listingId]);
+    await run("DELETE FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [user.id, listingId]);
   } else {
-    run("INSERT INTO saved_listings (seeker_id, listing_id, created_at) VALUES (?,?,?)", [
+    await run("INSERT INTO saved_listings (seeker_id, listing_id, created_at) VALUES (?,?,?)", [
       user.id,
       listingId,
       now(),
@@ -248,11 +246,11 @@ export async function reportListing(_prev: ActionState, data: FormData): Promise
     return { error: "Pick what went wrong", errors: fieldErrors(parsed.error) };
   }
 
-  if (!get("SELECT 1 AS ok FROM listings WHERE id = ?", [parsed.data.listing_id])) {
+  if (!await get("SELECT 1 AS ok FROM listings WHERE id = ?", [parsed.data.listing_id])) {
     return { error: "That listing is gone" };
   }
 
-  run(
+  await run(
     "INSERT INTO reports (id, listing_id, reporter_id, reason, details, status, created_at) VALUES (?,?,?,?,?,'open',?)",
     [newId("rpt"), parsed.data.listing_id, user?.id ?? null, parsed.data.reason, parsed.data.details, now()],
   );
@@ -261,7 +259,7 @@ export async function reportListing(_prev: ActionState, data: FormData): Promise
   // trust it enough to hide the listing, while leaving the report for an admin
   // so a business cannot be knocked offline by one bad actor.
   if (parsed.data.reason === "gone") {
-    run(
+    await run(
       "UPDATE listings SET portions_remaining = 0, status = 'gone', updated_at = ? WHERE id = ? AND status = 'active'",
       [now(), parsed.data.listing_id],
     );

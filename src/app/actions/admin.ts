@@ -17,8 +17,14 @@ export type AdminState = { ok?: boolean; error?: string; message?: string };
  * those decisions should be attributable, and reversible by someone who can
  * see who made them and why.
  */
-function logAction(adminId: string, action: string, targetType: string, targetId: string, note = "") {
-  run(
+async function logAction(
+  adminId: string,
+  action: string,
+  targetType: string,
+  targetId: string,
+  note = "",
+) {
+  await run(
     "INSERT INTO admin_actions (id, admin_id, action, target_type, target_id, note, created_at) VALUES (?,?,?,?,?,?,?)",
     [newId("act"), adminId, action, targetType, targetId, clean(note, 500), now()],
   );
@@ -35,24 +41,24 @@ export async function setProviderStatus(_prev: AdminState, data: FormData): Prom
     return { error: "That isn't a valid status" };
   }
 
-  const provider = get<{ user_id: string; business_name: string }>(
+  const provider = await get<{ user_id: string; business_name: string }>(
     "SELECT user_id, business_name FROM providers WHERE id = ?",
     [providerId],
   );
   if (!provider) return { error: "No such business" };
 
-  run("UPDATE providers SET status = ?, reviewed_at = ?, review_note = ? WHERE id = ?", [
+  await run("UPDATE providers SET status = ?, reviewed_at = ?, review_note = ? WHERE id = ?", [
     status,
     now(),
     clean(note, 500),
     providerId,
   ]);
 
-  logAction(admin.id, `provider:${status}`, "provider", providerId, note);
+  await logAction(admin.id, `provider:${status}`, "provider", providerId, note);
 
   // Tell them. A business left guessing why it cannot post stops trying.
   if (status === "approved") {
-    enqueue({
+    await enqueue({
       userId: provider.user_id,
       channel: "email",
       title: "You can start posting food",
@@ -61,7 +67,7 @@ export async function setProviderStatus(_prev: AdminState, data: FormData): Prom
     });
     await flushQueue();
   } else if (status === "suspended") {
-    enqueue({
+    await enqueue({
       userId: provider.user_id,
       channel: "email",
       title: "Posting is paused for your business",
@@ -84,14 +90,14 @@ export async function resolveReport(_prev: AdminState, data: FormData): Promise<
 
   if (!["reviewed", "dismissed"].includes(outcome)) return { error: "That isn't a valid outcome" };
 
-  run("UPDATE reports SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?", [
+  await run("UPDATE reports SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?", [
     outcome,
     now(),
     admin.id,
     reportId,
   ]);
 
-  logAction(admin.id, `report:${outcome}`, "report", reportId);
+  await logAction(admin.id, `report:${outcome}`, "report", reportId);
 
   revalidatePath("/admin");
   return { ok: true, message: outcome === "reviewed" ? "Marked as handled." : "Dismissed." };
@@ -103,8 +109,8 @@ export async function removeListing(_prev: AdminState, data: FormData): Promise<
   const listingId = String(data.get("listing_id") ?? "");
   const note = String(data.get("note") ?? "");
 
-  run("UPDATE listings SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), listingId]);
-  logAction(admin.id, "listing:removed", "listing", listingId, note);
+  await run("UPDATE listings SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), listingId]);
+  await logAction(admin.id, "listing:removed", "listing", listingId, note);
 
   revalidatePath("/admin");
   revalidatePath("/food");

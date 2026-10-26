@@ -26,22 +26,34 @@ export default async function ProviderDashboard() {
   const lang = await getLang(user.language);
   const t = translator(lang);
 
-  const listings = listingsForProvider(provider.id, 200);
+  const listings = await listingsForProvider(provider.id, 200);
   const live = listings.filter((l) => isListable(liveState(l)));
   const past = listings.filter((l) => !isListable(liveState(l)));
 
-  const impact = get<{ portions: number; count: number }>(
+  const impact = await get<{ portions: number; count: number }>(
     `SELECT COALESCE(SUM(portions_total - portions_remaining), 0) AS portions,
             COUNT(*) AS count
      FROM listings WHERE provider_id = ?`,
     [provider.id],
   );
 
-  const rules = all<RuleSummary>(
+  const rules = await all<RuleSummary>(
     `SELECT id, weekdays, start_minutes, end_minutes, template, paused, last_run_on
      FROM recurring_rules WHERE provider_id = ? ORDER BY created_at DESC`,
     [provider.id],
   );
+
+  // Saved-counts are one query per live listing. Gathered up front and in
+  // parallel: awaiting inside the render would serialise them into a chain of
+  // round trips, which over a network database is the difference between one
+  // slow page and a page that visibly crawls.
+  const interest = provider.show_interest
+    ? new Map(
+        await Promise.all(
+          live.map(async (l) => [l.id, await interestCount(l.id)] as const),
+        ),
+      )
+    : null;
 
   const canPost = provider.status === "approved";
 
@@ -112,7 +124,7 @@ export default async function ProviderDashboard() {
                   <ProviderListingRow
                     listing={l}
                     lang={lang}
-                    interested={provider.show_interest ? interestCount(l.id) : null}
+                    interested={interest?.get(l.id) ?? null}
                   />
                 </li>
               ))}

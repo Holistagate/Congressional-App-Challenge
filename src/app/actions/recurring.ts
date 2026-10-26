@@ -49,7 +49,7 @@ export async function createRecurringRule(
     return { error: "Check the highlighted fields", errors: fieldErrors(parsed.error) };
   }
 
-  run(
+  await run(
     `INSERT INTO recurring_rules (id, provider_id, weekdays, start_minutes, end_minutes,
        template, timezone, paused, created_at)
      VALUES (?,?,?,?,?,?,?,0,?)`,
@@ -83,13 +83,13 @@ export async function setRulePaused(_prev: RecurringState, data: FormData): Prom
   const paused = String(data.get("paused") ?? "") === "1";
 
   // Scoped to the owner, so an id from elsewhere changes nothing.
-  const owned = get("SELECT 1 AS ok FROM recurring_rules WHERE id = ? AND provider_id = ?", [
+  const owned = await get("SELECT 1 AS ok FROM recurring_rules WHERE id = ? AND provider_id = ?", [
     id,
     provider.id,
   ]);
   if (!owned) return { error: "That schedule isn't yours" };
 
-  run("UPDATE recurring_rules SET paused = ? WHERE id = ?", [paused ? 1 : 0, id]);
+  await run("UPDATE recurring_rules SET paused = ? WHERE id = ?", [paused ? 1 : 0, id]);
 
   revalidatePath("/provider");
   return { ok: true, message: paused ? "Paused." : "Running again." };
@@ -104,7 +104,7 @@ export async function deleteRule(_prev: RecurringState, data: FormData): Promise
   }
 
   const id = String(data.get("rule_id") ?? "");
-  run("DELETE FROM recurring_rules WHERE id = ? AND provider_id = ?", [id, provider.id]);
+  await run("DELETE FROM recurring_rules WHERE id = ? AND provider_id = ?", [id, provider.id]);
 
   revalidatePath("/provider");
   return { ok: true, message: "Schedule removed. Listings already posted are unaffected." };

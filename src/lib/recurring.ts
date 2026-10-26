@@ -67,7 +67,7 @@ export async function runDueRecurringRules(at: number = now()): Promise<number> 
   const today = localDate(at);
   const weekday = isoWeekday(at);
 
-  const rules = all<RuleRow>(
+  const rules = await all<RuleRow>(
     `SELECT r.*, p.business_name, p.street, p.city, p.state, p.zip
      FROM recurring_rules r
      JOIN providers p ON p.id = r.provider_id
@@ -94,7 +94,7 @@ export async function runDueRecurringRules(at: number = now()): Promise<number> 
     // Don't post a window that has already closed — if the cron was down all
     // evening, yesterday's dinner is not worth announcing now.
     if (end <= at) {
-      run("UPDATE recurring_rules SET last_run_on = ? WHERE id = ?", [today, rule.id]);
+      await run("UPDATE recurring_rules SET last_run_on = ? WHERE id = ?", [today, rule.id]);
       continue;
     }
 
@@ -106,7 +106,7 @@ export async function runDueRecurringRules(at: number = now()): Promise<number> 
     }
 
     const id = newId("lst");
-    run(
+    await run(
       `INSERT INTO listings (id, provider_id, description, categories, dietary_tags, allergen_tags,
          portions_total, portions_remaining, street, city, state, zip,
          pickup_start, pickup_end, notes, photo_url, status, recurring_rule_id,
@@ -137,7 +137,7 @@ export async function runDueRecurringRules(at: number = now()): Promise<number> 
       ],
     );
 
-    run("UPDATE recurring_rules SET last_run_on = ? WHERE id = ?", [today, rule.id]);
+    await run("UPDATE recurring_rules SET last_run_on = ? WHERE id = ?", [today, rule.id]);
 
     await notifyMatchingSeekers({
       id,

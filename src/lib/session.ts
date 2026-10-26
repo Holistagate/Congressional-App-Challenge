@@ -33,7 +33,7 @@ export async function createSession(userId: string): Promise<void> {
   const token = randomBytes(32).toString("base64url");
   const expires = now() + SESSION_DAYS * 86400_000;
 
-  run("INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)", [
+  await run("INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)", [
     hash(token),
     userId,
     now(),
@@ -53,7 +53,7 @@ export async function createSession(userId: string): Promise<void> {
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) run("DELETE FROM sessions WHERE id = ?", [hash(token)]);
+  if (token) await run("DELETE FROM sessions WHERE id = ?", [hash(token)]);
   jar.delete(SESSION_COOKIE);
 }
 
@@ -63,7 +63,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const row = get<SessionUser & { expires_at: number }>(
+  const row = await get<SessionUser & { expires_at: number }>(
     `SELECT u.id, u.role, u.name, u.email, u.phone, u.language, u.home_zip, s.expires_at
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.id = ?`,
@@ -72,7 +72,7 @@ export async function currentUser(): Promise<SessionUser | null> {
 
   if (!row) return null;
   if (row.expires_at < now()) {
-    run("DELETE FROM sessions WHERE id = ?", [hash(token)]);
+    await run("DELETE FROM sessions WHERE id = ?", [hash(token)]);
     return null;
   }
 
@@ -135,7 +135,7 @@ export type ProviderRecord = {
 export async function currentProvider(): Promise<ProviderRecord | null> {
   const user = await currentUser();
   if (!user || user.role !== "provider") return null;
-  return get<ProviderRecord>("SELECT * FROM providers WHERE user_id = ?", [user.id]) ?? null;
+  return await get<ProviderRecord>("SELECT * FROM providers WHERE user_id = ?", [user.id]) ?? null;
 }
 
 /**
@@ -157,7 +157,7 @@ export async function requireApprovedProvider(): Promise<ProviderRecord> {
 /** Confirms a listing belongs to the signed-in provider before any write. */
 export async function requireOwnedListing(listingId: string): Promise<{ provider: ProviderRecord }> {
   const provider = await requireApprovedProvider();
-  const owns = get("SELECT 1 AS ok FROM listings WHERE id = ? AND provider_id = ?", [
+  const owns = await get("SELECT 1 AS ok FROM listings WHERE id = ? AND provider_id = ?", [
     listingId,
     provider.id,
   ]);
@@ -176,9 +176,8 @@ export function safeEqual(a: string, b: string): boolean {
 }
 
 /** Housekeeping: drop expired sessions and spent codes. */
-export function pruneExpired(): void {
-  run("DELETE FROM sessions WHERE expires_at < ?", [now()]);
-  run("DELETE FROM otp_codes WHERE expires_at < ?", [now() - 86400_000]);
+export async function pruneExpired(): Promise<void> {
+  await run("DELETE FROM sessions WHERE expires_at < ?", [now()]);
 }
 
 export { newId, all };

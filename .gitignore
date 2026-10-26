@@ -46,3 +46,9 @@ next-env.d.ts
 /data/*.db-shm
 dev.log
 tsconfig.tsbuildinfo
+
+# Local development database (see README "A note on the local database")
+/node_modules/.cache/mealbridge/
+
+# A separate clone that happens to sit inside this folder; not part of this repo.
+/Congressional-App/

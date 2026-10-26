@@ -1,92 +1,118 @@
 import "server-only";
-import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { createClient, type Client, type InValue } from "@libsql/client";
 import path from "node:path";
 
 /**
- * SQLite via node:sqlite, which ships with Node 22.5+ and needs no native
- * build step. That matters more than it sounds: this project has to clone and
- * run on a judge's laptop without a Postgres install or a cloud account.
+ * SQLite, over libSQL.
  *
- * Nothing here is SQLite-specific beyond the driver. The schema is ordinary
- * SQL and the queries avoid SQLite dialect, so moving to Postgres is a driver
- * swap plus the placeholder style. See README "Moving to Postgres".
+ * One driver for both places this runs. Locally it opens a file in data/;
+ * in production it talks to Turso over HTTP. Same SQL, same code paths, so
+ * nothing can work on a laptop and quietly fail once deployed.
+ *
+ * This replaced Node's built-in `node:sqlite`, which was the right call while
+ * the project only had to run locally and the wrong one the moment it had to
+ * run on Vercel: serverless instances get an ephemeral filesystem, so a
+ * SQLite file there is empty on a cold start and gone again afterwards.
+ *
+ * Everything here is async because a network database cannot be anything
+ * else. That is the whole reason the data layer reads the way it does.
  */
 
-const DB_PATH = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.join(process.cwd(), "data", "mealbridge.db");
+/**
+ * Where the local database lives when Turso is not configured.
+ *
+ * Deliberately inside node_modules/.cache rather than the project tree. Next's
+ * file watcher has no ignore list (watchOptions only exposes a poll interval),
+ * and SQLite rewrites its -wal and -shm files on every read — so a database
+ * kept beside the source puts the dev server in a loop: page load writes the
+ * WAL, watcher fires, Fast Refresh reloads the page, which loads again.
+ * Watchers universally skip node_modules, which ends it.
+ *
+ * Mirrored in scripts/db-setup.mjs; change both together.
+ */
+const DATABASE_URL =
+  process.env.TURSO_DATABASE_URL ??
+  `file:${path.join(process.cwd(), "node_modules", ".cache", "mealbridge", "dev.db")}`;
 
 declare global {
-  // Next.js reloads modules on every edit in dev. Without a global handle we
-  // would leak a file handle per reload until SQLite refuses to open more.
-  var __mealbridge_db: DatabaseSync | undefined;
+  // Next.js reloads modules on every edit in dev, and serverless keeps the
+  // module between invocations. Either way we want one client, not one per
+  // reload or per request.
+  var __mealbridge_db: Client | undefined;
 }
 
-function open(): DatabaseSync {
-  const db = new DatabaseSync(DB_PATH);
-  // WAL lets the notification worker read while a provider is mid-post.
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA foreign_keys = ON");
-  db.exec("PRAGMA busy_timeout = 5000");
-  return db;
+function open(): Client {
+  return createClient({
+    url: DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+    // Timestamps here are epoch milliseconds — about 1.7e12, comfortably
+    // inside a JS number. Without this they arrive as BigInt and every
+    // comparison against Date.now() silently becomes a type error.
+    intMode: "number",
+  });
 }
 
-export function getDb(): DatabaseSync {
+export function getDb(): Client {
   if (!globalThis.__mealbridge_db) globalThis.__mealbridge_db = open();
   return globalThis.__mealbridge_db;
 }
 
-/** Applies schema.sql. Idempotent — every statement is CREATE ... IF NOT EXISTS. */
-export function migrate(db: DatabaseSync = getDb()): void {
-  const schema = readFileSync(path.join(process.cwd(), "src", "db", "schema.sql"), "utf8");
-  db.exec(schema);
+/** True when pointed at Turso rather than a local file. */
+export function isRemote(): boolean {
+  return !DATABASE_URL.startsWith("file:");
 }
 
-/* ------------------------------------------------------------------ helpers */
+/* ------------------------------------------------------------------ types */
 
-type Params = Record<string, string | number | null> | Array<string | number | null>;
+export type Params = Record<string, InValue> | InValue[];
+
+type Row = Record<string, unknown>;
 
 /**
- * node:sqlite hands back rows with a null prototype. React refuses to serialise
- * those across the server/client boundary ("Classes or null prototypes are not
- * supported"), which would make every row unusable as a prop. Re-spreading into
- * an ordinary object here means callers never have to think about it.
+ * libSQL hands back rows that are array-like with named accessors. React
+ * refuses to serialise those across the server/client boundary, the same way
+ * it refused node:sqlite's null-prototype rows, so everything is rebuilt as a
+ * plain object before it leaves this module.
  */
-function plain<T>(row: unknown): T {
-  return { ...(row as object) } as T;
+function toPlain<T>(columns: string[], values: readonly unknown[]): T {
+  const out: Row = {};
+  for (let i = 0; i < columns.length; i++) out[columns[i]] = values[i];
+  return out as T;
 }
 
-export function all<T = Record<string, unknown>>(sql: string, params: Params = []): T[] {
-  const stmt = getDb().prepare(sql);
-  const rows = Array.isArray(params) ? stmt.all(...params) : stmt.all(params);
-  return rows.map((r) => plain<T>(r));
+/* ---------------------------------------------------------------- queries */
+
+export async function all<T = Row>(sql: string, params: Params = []): Promise<T[]> {
+  const result = await getDb().execute({ sql, args: params });
+  return result.rows.map((r) => toPlain<T>(result.columns, r as unknown as unknown[]));
 }
 
-export function get<T = Record<string, unknown>>(sql: string, params: Params = []): T | undefined {
-  const stmt = getDb().prepare(sql);
-  const row = Array.isArray(params) ? stmt.get(...params) : stmt.get(params);
-  return row === undefined ? undefined : plain<T>(row);
+export async function get<T = Row>(sql: string, params: Params = []): Promise<T | undefined> {
+  const result = await getDb().execute({ sql, args: params });
+  if (result.rows.length === 0) return undefined;
+  return toPlain<T>(result.columns, result.rows[0] as unknown as unknown[]);
 }
 
-export function run(sql: string, params: Params = []) {
-  const stmt = getDb().prepare(sql);
-  return Array.isArray(params) ? stmt.run(...params) : stmt.run(params);
+export async function run(sql: string, params: Params = []): Promise<{ changes: number }> {
+  const result = await getDb().execute({ sql, args: params });
+  return { changes: Number(result.rowsAffected ?? 0) };
 }
 
-/** Wraps fn in a transaction. node:sqlite has no transaction helper of its own. */
-export function tx<T>(fn: () => T): T {
-  const db = getDb();
-  db.exec("BEGIN");
-  try {
-    const result = fn();
-    db.exec("COMMIT");
-    return result;
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
-  }
+/**
+ * Several statements, applied together or not at all.
+ *
+ * libSQL's own batch rather than BEGIN/COMMIT around the helpers above: over
+ * a network connection those would be separate round trips with no guarantee
+ * they land on the same session, which is a transaction in name only.
+ */
+export async function batch(statements: { sql: string; args?: Params }[]): Promise<void> {
+  await getDb().batch(
+    statements.map((s) => ({ sql: s.sql, args: s.args ?? [] })),
+    "write",
+  );
 }
+
+/* ------------------------------------------------------------------ utils */
 
 /** Short, URL-safe, collision-resistant enough for row ids. */
 export function newId(prefix = ""): string {

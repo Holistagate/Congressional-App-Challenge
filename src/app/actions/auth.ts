@@ -1,21 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import {
-  parseIdentifier,
-  maskIdentifier,
-  issueCode,
-  verifyCode,
-  findUserByIdentifier,
-  upsertUser,
-} from "@/lib/auth";
+import { parseIdentifier, findUserByIdentifier, upsertUser } from "@/lib/auth";
 import { createSession, destroySession, currentUser, pruneExpired } from "@/lib/session";
 import { limit, retryMessage } from "@/lib/ratelimit";
 import { run, newId, now } from "@/db/index";
-import { signupSchema, codeSchema, identifierSchema, providerProfileSchema, fieldErrors } from "@/lib/validation";
+import { signupSchema, identifierSchema, providerProfileSchema, fieldErrors } from "@/lib/validation";
 import { zipExists } from "@/db/queries";
-import { PENDING_COOKIE } from "@/lib/cookies";
 
 /**
  * Every action here re-checks its own inputs and its own authorisation. Server
@@ -27,16 +18,30 @@ export type FormState = {
   ok?: boolean;
   error?: string;
   errors?: Record<string, string>;
-  /** Carried between the two steps of sign-in. */
-  identifier?: string;
-  masked?: string;
   values?: Record<string, string>;
 };
 
 
-/* ------------------------------------------------------- step 1: request -- */
+/* ------------------------------------------------------------- sign in --- */
 
-export async function requestCode(_prev: FormState, data: FormData): Promise<FormState> {
+/**
+ * Signs in, creating the account if this is the first time.
+ *
+ * There is no password and no emailed code. The product has to reach people
+ * who are trying to find dinner on a borrowed phone, and every step between
+ * them and a list of addresses loses some of them; a code is also a step that
+ * only works if a mail or SMS provider is configured, which in this
+ * deployment it is not.
+ *
+ * The honest consequence: possession of an email address is not proved, so
+ * anyone who types a known address is signed in as that person. That is
+ * acceptable for a seeker, whose account holds a ZIP code and a few saved
+ * listings, and it is NOT acceptable for an approved provider or an admin.
+ * See README "Authentication" — restoring the one-time code is a matter of
+ * putting back `issueCode`/`verifyCode`, which are in the git history, and
+ * setting RESEND_API_KEY or the Twilio variables.
+ */
+export async function signIn(_prev: FormState, data: FormData): Promise<FormState> {
   const raw = String(data.get("identifier") ?? "");
   const parsed = identifierSchema.safeParse(raw);
   if (!parsed.success) {
@@ -51,72 +56,24 @@ export async function requestCode(_prev: FormState, data: FormData): Promise<For
     };
   }
 
+  // Still rate limited. Without a code step this is the only thing standing
+  // between the sign-in form and someone walking a list of addresses.
   const gate = await limit("otpRequest");
   if (!gate.ok) {
     return { error: retryMessage(gate.retryAfterSeconds), values: { identifier: raw } };
   }
 
   const role = data.get("role") === "provider" ? "provider" : "seeker";
-  const name = String(data.get("name") ?? "");
+  const name = String(data.get("name") ?? "").slice(0, 120);
 
-  // Remember what this sign-in is for, so step two can create the right kind
-  // of account without trusting a hidden field the browser could rewrite.
-  const jar = await cookies();
-  jar.set(
-    PENDING_COOKIE,
-    JSON.stringify({ identifier: id.value, kind: id.kind, role, name: name.slice(0, 120) }),
-    { httpOnly: true, sameSite: "lax", path: "/", maxAge: 900, secure: process.env.NODE_ENV === "production" },
-  );
-
-  await issueCode(id);
-  pruneExpired();
-
-  return { ok: true, identifier: id.value, masked: maskIdentifier(id) };
-}
-
-/* -------------------------------------------------------- step 2: verify -- */
-
-export async function submitCode(_prev: FormState, data: FormData): Promise<FormState> {
-  const jar = await cookies();
-  const pendingRaw = jar.get(PENDING_COOKIE)?.value;
-  if (!pendingRaw) return { error: "That sign-in expired. Ask for a new code." };
-
-  let pending: { identifier: string; kind: "email" | "phone"; role: "seeker" | "provider"; name: string };
-  try {
-    pending = JSON.parse(pendingRaw);
-  } catch {
-    return { error: "That sign-in expired. Ask for a new code." };
-  }
-
-  const gate = await limit("otpVerify");
-  if (!gate.ok) return { error: retryMessage(gate.retryAfterSeconds) };
-
-  const code = codeSchema.safeParse(String(data.get("code") ?? ""));
-  if (!code.success) {
-    return { error: "Enter the 6-digit code", masked: pending.identifier };
-  }
-
-  const id = { kind: pending.kind, value: pending.identifier } as const;
-  const result = verifyCode(id, code.data);
-
-  if (!result.ok) {
-    const message =
-      result.reason === "expired"
-        ? "That code has expired. Ask for a new one."
-        : result.reason === "too_many"
-          ? "Too many tries. Ask for a new code."
-          : "That code isn't right. Check it and try again.";
-    return { error: message, masked: pending.identifier };
-  }
-
-  const existing = findUserByIdentifier(id);
-  const userId = existing?.id ?? upsertUser(id, { role: pending.role, name: pending.name });
+  const existing = await findUserByIdentifier(id);
+  const userId = existing?.id ?? (await upsertUser(id, { role, name }));
 
   await createSession(userId);
-  jar.delete(PENDING_COOKIE);
+  await pruneExpired();
 
-  const role = existing?.role ?? pending.role;
-  redirect(role === "provider" ? "/provider" : role === "admin" ? "/admin" : "/food");
+  const landing = existing?.role ?? role;
+  redirect(landing === "provider" ? "/provider" : landing === "admin" ? "/admin" : "/food");
 }
 
 /* --------------------------------------------------------------- sign up -- */
@@ -169,7 +126,7 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
 
   // The ZIP has to exist in the bundled centroid table or distance sorting
   // would silently drop this business out of every search.
-  if (!zipExists(profile.data.zip)) {
+  if (!await zipExists(profile.data.zip)) {
     return {
       error: "Check the highlighted fields",
       errors: { zip: "We don't recognise that ZIP code" },
@@ -182,7 +139,7 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     return { error: "Check the highlighted fields", errors: { identifier: "Enter an email address or phone number" }, values };
   }
 
-  if (findUserByIdentifier(id)) {
+  if (await findUserByIdentifier(id)) {
     return {
       error: "Check the highlighted fields",
       errors: { identifier: "There's already an account using that. Sign in instead." },
@@ -190,9 +147,9 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     };
   }
 
-  const userId = upsertUser(id, { role: "provider", name: profile.data.contact_name, language: account.data.language });
+  const userId = await upsertUser(id, { role: "provider", name: profile.data.contact_name, language: account.data.language });
 
-  run(
+  await run(
     `INSERT INTO providers (id, user_id, business_name, street, city, state, zip,
        contact_name, phone, email, permit_number, status, created_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?)`,
@@ -212,15 +169,8 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     ],
   );
 
-  const jar = await cookies();
-  jar.set(
-    PENDING_COOKIE,
-    JSON.stringify({ identifier: id.value, kind: id.kind, role: "provider", name: profile.data.contact_name }),
-    { httpOnly: true, sameSite: "lax", path: "/", maxAge: 900, secure: process.env.NODE_ENV === "production" },
-  );
-
-  await issueCode(id);
-  return { ok: true, identifier: id.value, masked: maskIdentifier(id) };
+  await createSession(userId);
+  redirect("/provider");
 }
 
 /* ---------------------------------------------------------------- misc ---- */

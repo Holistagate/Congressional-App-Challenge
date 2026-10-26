@@ -38,7 +38,8 @@ export default async function FoodPage(props: PageProps<"/food">) {
   }
 
   const params = await props.searchParams;
-  const origin = lookupZip(zip)!;
+  // readZip() has already validated this against the table, so a row exists.
+  const origin = (await lookupZip(zip))!;
 
   const radiusParam = Number(first(params.radius));
   const radius = isRadiusOption(radiusParam) ? radiusParam : 10;
@@ -51,7 +52,7 @@ export default async function FoodPage(props: PageProps<"/food">) {
     .map(String)
     .filter((d) => DIETARY_IDS.includes(d));
 
-  const listings = listNearby({
+  const listings = await listNearby({
     lat: origin.lat,
     lng: origin.lng,
     zip,

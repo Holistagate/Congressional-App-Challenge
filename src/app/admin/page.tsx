@@ -18,19 +18,19 @@ export default async function AdminPage() {
 
   const lang = await getLang(user.language);
 
-  const pending = all<ProviderSummary>(
+  const pending = await all<ProviderSummary>(
     `SELECT id, business_name, street, city, state, zip, contact_name, phone, email,
             permit_number, status, created_at
      FROM providers WHERE status = 'pending' ORDER BY created_at ASC`,
   );
 
-  const others = all<ProviderSummary>(
+  const others = await all<ProviderSummary>(
     `SELECT id, business_name, street, city, state, zip, contact_name, phone, email,
             permit_number, status, created_at
      FROM providers WHERE status != 'pending' ORDER BY business_name ASC`,
   );
 
-  const reports = all<ReportSummary>(
+  const reports = await all<ReportSummary>(
     `SELECT r.id, r.reason, r.details, r.created_at,
             l.id AS listing_id, l.description, l.status AS listing_status,
             p.business_name
@@ -41,20 +41,26 @@ export default async function AdminPage() {
      ORDER BY r.created_at DESC`,
   );
 
+  // Five independent counts. Run together rather than one after another:
+  // awaited in sequence against a network database this is five round trips
+  // for a page that needs one.
+  const [activeListings, portionsShared, approvedProviders, seekers, activeAlerts] =
+    await Promise.all([
+      countOf("SELECT COUNT(*) AS n FROM listings WHERE status = 'active' AND pickup_end > ?", [
+        Date.now(),
+      ]),
+      countOf("SELECT COALESCE(SUM(portions_total - portions_remaining), 0) AS n FROM listings"),
+      countOf("SELECT COUNT(*) AS n FROM providers WHERE status = 'approved'"),
+      countOf("SELECT COUNT(*) AS n FROM users WHERE role = 'seeker'"),
+      countOf("SELECT COUNT(*) AS n FROM alerts WHERE active = 1"),
+    ]);
+
   const stats = {
-    activeListings:
-      get<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM listings WHERE status = 'active' AND pickup_end > ?",
-        [Date.now()],
-      )?.n ?? 0,
-    portionsShared:
-      get<{ n: number }>(
-        "SELECT COALESCE(SUM(portions_total - portions_remaining), 0) AS n FROM listings",
-      )?.n ?? 0,
-    approvedProviders:
-      get<{ n: number }>("SELECT COUNT(*) AS n FROM providers WHERE status = 'approved'")?.n ?? 0,
-    seekers: get<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE role = 'seeker'")?.n ?? 0,
-    activeAlerts: get<{ n: number }>("SELECT COUNT(*) AS n FROM alerts WHERE active = 1")?.n ?? 0,
+    activeListings,
+    portionsShared,
+    approvedProviders,
+    seekers,
+    activeAlerts,
   };
 
   return (
@@ -137,6 +143,12 @@ export default async function AdminPage() {
       <SiteFooter lang={lang} />
     </>
   );
+}
+
+/** A single-number query, defaulting to zero when the table is empty. */
+async function countOf(sql: string, args: (string | number)[] = []): Promise<number> {
+  const row = await get<{ n: number }>(sql, args);
+  return row?.n ?? 0;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

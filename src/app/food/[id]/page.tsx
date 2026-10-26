@@ -21,13 +21,13 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/food/[id]">): Promise<Metadata> {
   const { id } = await props.params;
-  const listing = getListing(id);
+  const listing = await getListing(id);
   return { title: listing ? listing.description.slice(0, 60) : "Listing" };
 }
 
 export default async function ListingPage(props: PageProps<"/food/[id]">) {
   const { id } = await props.params;
-  const listing = getListing(id);
+  const listing = await getListing(id);
   if (!listing) notFound();
 
   const user = await currentUser();
@@ -35,8 +35,8 @@ export default async function ListingPage(props: PageProps<"/food/[id]">) {
   const t = translator(lang);
 
   const zip = await readZip();
-  const origin = zip ? lookupZip(zip) : null;
-  const dest = lookupZip(listing.zip);
+  const origin = zip ? await lookupZip(zip) : null;
+  const dest = await lookupZip(listing.zip);
 
   const miles = origin && dest ? haversineMiles(origin, dest) : null;
   const sameZip = origin?.zip === listing.zip;
@@ -53,7 +53,7 @@ export default async function ListingPage(props: PageProps<"/food/[id]">) {
   const address = `${listing.street}, ${listing.city}, ${listing.state} ${listing.zip}`;
 
   const saved = user
-    ? !!get("SELECT 1 AS ok FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [
+    ? !!await get("SELECT 1 AS ok FROM saved_listings WHERE seeker_id = ? AND listing_id = ?", [
         user.id,
         listing.id,
       ])
