@@ -9,10 +9,18 @@ export const dynamic = "force-dynamic";
 /**
  * Housekeeping, on a schedule.
  *
- * Point a cron at this once a minute (Vercel Cron, GitHub Actions, or
+ * Point a cron at this as often as you can (Vercel Cron, GitHub Actions, or
  * `npm run worker` locally). Everything it does is also done defensively at
  * read time, so a missed run degrades the data rather than the experience —
- * a seeker never sees an expired listing just because this did not fire.
+ * a seeker never sees an expired listing just because this did not fire,
+ * because listNearby filters on pickup_end regardless.
+ *
+ * vercel.json asks for daily, not because daily is right but because Vercel's
+ * Hobby plan rejects anything more frequent and a project that will not
+ * deploy is worse than one that tidies up slowly. The cost is real and worth
+ * knowing: queued alerts go out once a day rather than within minutes. If
+ * alerts need to be prompt, point an external scheduler at this URL with the
+ * CRON_SECRET as a bearer token — the endpoint does not care who calls it.
  *
  * Protected by a shared secret, because it writes.
  */
