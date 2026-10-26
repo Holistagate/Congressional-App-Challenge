@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   cacheComponents: false,
   partialPrefetching: false,
 
+  // Keep the libSQL packages out of the bundle. The Node build ships a
+  // per-platform native binary, and bundling a .node file into a serverless
+  // function is how "works locally, fails on Vercel" happens. Marked external
+  // so it is required at runtime, on the one code path that needs it.
+  serverExternalPackages: ["@libsql/client", "libsql"],
+
   turbopack: {
     rules: {
       "*.css": {

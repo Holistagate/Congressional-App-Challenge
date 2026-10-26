@@ -8,7 +8,7 @@ Built for the Congressional App Challenge.
 
 ## Run it
 
-Needs **Node 22.5 or newer** (for the built-in `node:sqlite`). Nothing else — no database server, no cloud account, no API keys.
+Needs **Node 20 or newer**. Nothing else — no database server, no cloud account, no API keys.
 
 ```bash
 npm install
@@ -276,6 +276,19 @@ to expire listings, post recurring rules and flush the notification queue.
 Nothing else needs changing: the app reads `TURSO_DATABASE_URL` if it is set
 and falls back to a local file if it is not, so the same code runs in both
 places.
+
+### Why two libSQL entry points
+
+`src/db/index.ts` picks its client from the URL. A remote database gets
+`@libsql/client/web`, which is plain `fetch` and has no native dependency; a
+`file:` URL gets `@libsql/client`, whose Node build depends on `libsql`, a
+binary compiled per platform.
+
+That split is not tidiness. Bundling a per-platform `.node` file into a
+serverless function is exactly how something works on a laptop and fails on
+Vercel, and both packages are listed in `serverExternalPackages` so the
+bundler leaves them alone. The native build is only ever reached for a `file:`
+URL, which only ever happens in development.
 
 ### Running it anywhere else
 

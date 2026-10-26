@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, type Client, type InValue } from "@libsql/client";
+import type { Client, InValue } from "@libsql/client";
 import path from "node:path";
 
 /**
@@ -16,6 +16,14 @@ import path from "node:path";
  *
  * Everything here is async because a network database cannot be anything
  * else. That is the whole reason the data layer reads the way it does.
+ *
+ * Two entry points, chosen by the URL. `@libsql/client` is the Node build and
+ * depends on `libsql`, a native binary compiled per platform — fine on a
+ * laptop, fatal in a serverless function, where the bundler tries to pack a
+ * .node file built for the wrong operating system. `@libsql/client/web` is
+ * the same API over plain fetch with no native dependency, which is what any
+ * remote database gets. The native build is only ever reached for a file:
+ * URL, which only ever happens in development.
  */
 
 /**
@@ -41,19 +49,27 @@ declare global {
   var __mealbridge_db: Client | undefined;
 }
 
-function open(): Client {
-  return createClient({
-    url: DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
-    // Timestamps here are epoch milliseconds — about 1.7e12, comfortably
-    // inside a JS number. Without this they arrive as BigInt and every
-    // comparison against Date.now() silently becomes a type error.
-    intMode: "number",
-  });
+const options = {
+  url: DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+  // Timestamps here are epoch milliseconds — about 1.7e12, comfortably
+  // inside a JS number. Without this they arrive as BigInt and every
+  // comparison against Date.now() silently becomes a type error.
+  intMode: "number" as const,
+};
+
+async function open(): Promise<Client> {
+  if (DATABASE_URL.startsWith("file:")) {
+    // Development only. Pulls in the native binding.
+    const { createClient } = await import("@libsql/client");
+    return createClient(options);
+  }
+  const { createClient } = await import("@libsql/client/web");
+  return createClient(options);
 }
 
-export function getDb(): Client {
-  if (!globalThis.__mealbridge_db) globalThis.__mealbridge_db = open();
+export async function getDb(): Promise<Client> {
+  if (!globalThis.__mealbridge_db) globalThis.__mealbridge_db = await open();
   return globalThis.__mealbridge_db;
 }
 
@@ -83,18 +99,18 @@ function toPlain<T>(columns: string[], values: readonly unknown[]): T {
 /* ---------------------------------------------------------------- queries */
 
 export async function all<T = Row>(sql: string, params: Params = []): Promise<T[]> {
-  const result = await getDb().execute({ sql, args: params });
+  const result = await (await getDb()).execute({ sql, args: params });
   return result.rows.map((r) => toPlain<T>(result.columns, r as unknown as unknown[]));
 }
 
 export async function get<T = Row>(sql: string, params: Params = []): Promise<T | undefined> {
-  const result = await getDb().execute({ sql, args: params });
+  const result = await (await getDb()).execute({ sql, args: params });
   if (result.rows.length === 0) return undefined;
   return toPlain<T>(result.columns, result.rows[0] as unknown as unknown[]);
 }
 
 export async function run(sql: string, params: Params = []): Promise<{ changes: number }> {
-  const result = await getDb().execute({ sql, args: params });
+  const result = await (await getDb()).execute({ sql, args: params });
   return { changes: Number(result.rowsAffected ?? 0) };
 }
 
@@ -106,7 +122,7 @@ export async function run(sql: string, params: Params = []): Promise<{ changes: 
  * they land on the same session, which is a transaction in name only.
  */
 export async function batch(statements: { sql: string; args?: Params }[]): Promise<void> {
-  await getDb().batch(
+  await (await getDb()).batch(
     statements.map((s) => ({ sql: s.sql, args: s.args ?? [] })),
     "write",
   );
