@@ -288,6 +288,19 @@ h3 {
   line-height: 1.5;
 }
 
+/* An explanation of what just happened, not a failure. Distinct from
+   .error-text so that "choose a password" does not read as "you got that
+   wrong" to someone who has done nothing wrong yet. */
+.notice {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-pine);
+  background: color-mix(in srgb, var(--color-pine) 7%, transparent);
+  border-left: 3px solid var(--color-pine);
+  border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+  padding: 0.75rem 0.875rem;
+}
+
 .error-text {
   font-size: 0.875rem;
   color: var(--color-stop);

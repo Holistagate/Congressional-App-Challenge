@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { parseIdentifier, findUserByIdentifier, upsertUser } from "@/lib/auth";
+import { parseIdentifier, findUserByIdentifier, createUser, setPassword } from "@/lib/auth";
+import { verifyPassword, MIN_PASSWORD } from "@/lib/password";
 import { createSession, destroySession, currentUser, pruneExpired } from "@/lib/session";
 import { limit, retryMessage } from "@/lib/ratelimit";
 import { run, newId, now } from "@/db/index";
@@ -19,6 +20,9 @@ export type FormState = {
   error?: string;
   errors?: Record<string, string>;
   values?: Record<string, string>;
+  /** Show the "choose a password" fields: this address has no password yet. */
+  needsPassword?: boolean;
+  notice?: string;
 };
 
 
@@ -27,19 +31,21 @@ export type FormState = {
 /**
  * Signs in, creating the account if this is the first time.
  *
- * There is no password and no emailed code. The product has to reach people
- * who are trying to find dinner on a borrowed phone, and every step between
- * them and a list of addresses loses some of them; a code is also a step that
- * only works if a mail or SMS provider is configured, which in this
- * deployment it is not.
+ * An address alone used to be enough, which meant anyone who knew an address
+ * was signed in as that person — fine for a seeker whose account holds a ZIP
+ * code, not fine for an approved restaurant or for the admin who approves
+ * them. Now the address is a username and the password is the proof.
  *
- * The honest consequence: possession of an email address is not proved, so
- * anyone who types a known address is signed in as that person. That is
- * acceptable for a seeker, whose account holds a ZIP code and a few saved
- * listings, and it is NOT acceptable for an approved provider or an admin.
- * See README "Authentication" — restoring the one-time code is a matter of
- * putting back `issueCode`/`verifyCode`, which are in the git history, and
- * setting RESEND_API_KEY or the Twilio variables.
+ * Three cases, and the form shows a second step for two of them:
+ *
+ *   - the account exists and has a password: check it
+ *   - the account exists without one (seeded, or created before this): ask
+ *     them to choose one now rather than locking them out
+ *   - no account: create it, with the password they choose
+ *
+ * The same "choose a password" step therefore covers both a brand new user
+ * and an old account, and neither path reveals which it was. Telling someone
+ * "no account with that address" is a free way to enumerate who has one.
  */
 export async function signIn(_prev: FormState, data: FormData): Promise<FormState> {
   const raw = String(data.get("identifier") ?? "");
@@ -65,15 +71,68 @@ export async function signIn(_prev: FormState, data: FormData): Promise<FormStat
 
   const role = data.get("role") === "provider" ? "provider" : "seeker";
   const name = String(data.get("name") ?? "").slice(0, 120);
+  const password = String(data.get("password") ?? "");
+  const confirm = String(data.get("confirm") ?? "");
 
   const existing = await findUserByIdentifier(id);
-  const userId = existing?.id ?? (await upsertUser(id, { role, name }));
+  const settingUp = !existing || !existing.password_hash;
 
-  await createSession(userId);
+  // Choosing a password: both fields, twice, before anything is written.
+  if (settingUp) {
+    const keep = { identifier: raw };
+
+    // The confirm field only exists once we have asked for it. On the first
+    // submit it is absent, and complaining that it does not match would be a
+    // complaint about a box the person has never seen.
+    if (!password || !data.has("confirm")) {
+      return {
+        needsPassword: true,
+        notice: existing
+          ? "This account doesn't have a password yet. Choose one now."
+          : "No account with that address yet. Choose a password and we'll create one.",
+        values: keep,
+      };
+    }
+
+    if (password.length < MIN_PASSWORD) {
+      return {
+        needsPassword: true,
+        errors: { password: `Use at least ${MIN_PASSWORD} characters` },
+        values: keep,
+      };
+    }
+
+    if (password !== confirm) {
+      return {
+        needsPassword: true,
+        errors: { confirm: "Those don't match" },
+        values: keep,
+      };
+    }
+
+    const userId = existing?.id ?? (await createUser(id, { role, name }));
+    await setPassword(userId, password);
+    await createSession(userId);
+    await pruneExpired();
+
+    const landing = existing?.role ?? role;
+    redirect(landing === "provider" ? "/provider" : landing === "admin" ? "/admin" : "/food");
+  }
+
+  if (!(await verifyPassword(password, existing.password_hash))) {
+    // One message for a wrong password and for an address that does not
+    // exist. Separating them turns this form into an account-enumeration
+    // tool, and the people with most to lose here are the ones least able
+    // to absorb it.
+    return { error: "That email or password isn't right", values: { identifier: raw } };
+  }
+
+  await createSession(existing.id);
   await pruneExpired();
 
-  const landing = existing?.role ?? role;
-  redirect(landing === "provider" ? "/provider" : landing === "admin" ? "/admin" : "/food");
+  redirect(
+    existing.role === "provider" ? "/provider" : existing.role === "admin" ? "/admin" : "/food",
+  );
 }
 
 /* --------------------------------------------------------------- sign up -- */
@@ -147,7 +206,30 @@ export async function registerProvider(_prev: FormState, data: FormData): Promis
     };
   }
 
-  const userId = await upsertUser(id, { role: "provider", name: profile.data.contact_name, language: account.data.language });
+  // A restaurant's account can post food under its name to everyone nearby,
+  // so this one is not optional and never has been skippable.
+  const password = String(data.get("password") ?? "");
+  if (password.length < MIN_PASSWORD) {
+    return {
+      error: "Check the highlighted fields",
+      errors: { password: `Use at least ${MIN_PASSWORD} characters` },
+      values,
+    };
+  }
+  if (password !== String(data.get("confirm") ?? "")) {
+    return {
+      error: "Check the highlighted fields",
+      errors: { confirm: "Those don't match" },
+      values,
+    };
+  }
+
+  const userId = await createUser(id, {
+    role: "provider",
+    name: profile.data.contact_name,
+    language: account.data.language,
+    password,
+  });
 
   await run(
     `INSERT INTO providers (id, user_id, business_name, street, city, state, zip,

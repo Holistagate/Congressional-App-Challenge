@@ -1,17 +1,19 @@
 import "server-only";
 import { get, run, newId, now } from "@/db/index";
+import { hashPassword } from "./password";
 
 /**
- * Identity, such as it is.
+ * Identity.
  *
- * There is no password anywhere in MealBridge, and no identity document, proof
- * of income or payment method. A person who needs dinner should not have to
- * invent and remember a password to find out where it is.
+ * An account is an address plus a password. There is no identity document, no
+ * proof of income and no payment method, and browsing food needs no account at
+ * all — a person who needs dinner tonight can type a ZIP and go. The password
+ * exists for the accounts where impersonation actually costs something: an
+ * approved restaurant posting in a stranger's name, and the admin who can
+ * approve restaurants.
  *
- * There is also, currently, no one-time code: sign-in trusts the address you
- * type. What remains here is the part that normalises an address into
- * something we can match on, and the account lookup behind it. See the note on
- * `signIn` in app/actions/auth.ts for what that costs.
+ * Accounts created before passwords, including every seeded one, have a null
+ * password_hash and are asked to choose one the next time they sign in.
  */
 
 export type Identifier = { kind: "email"; value: string } | { kind: "phone"; value: string };
@@ -29,8 +31,8 @@ export function parseIdentifier(raw: string): Identifier | null {
 
   if (input.includes("@")) {
     const email = input.toLowerCase();
-    // Deliberately permissive: the code we send is the real check on whether
-    // an address works, so over-strict syntax rules only lock out valid users.
+    // Deliberately permissive. Over-strict syntax rules lock out valid
+    // addresses, and the address is a username here, not a delivery route.
     if (!/^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(email) || email.length > 254) return null;
     return { kind: "email", value: email };
   }
@@ -49,21 +51,31 @@ export type NewUserInput = {
   role: "seeker" | "provider";
   name?: string;
   language?: "en" | "es";
+  password?: string;
 };
 
-export async function findUserByIdentifier(
-  id: Identifier,
-): Promise<{ id: string; role: string } | undefined> {
+export type UserAccount = { id: string; role: string; password_hash: string | null };
+
+export async function findUserByIdentifier(id: Identifier): Promise<UserAccount | undefined> {
   const column = id.kind === "email" ? "email" : "phone";
-  return await get<{ id: string; role: string }>(`SELECT id, role FROM users WHERE ${column} = ?`, [
-    id.value,
+  return await get<UserAccount>(
+    `SELECT id, role, password_hash FROM users WHERE ${column} = ?`,
+    [id.value],
+  );
+}
+
+/** Sets or replaces an account's password. */
+export async function setPassword(userId: string, password: string): Promise<void> {
+  await run("UPDATE users SET password_hash = ? WHERE id = ?", [
+    await hashPassword(password),
+    userId,
   ]);
 }
 
 export async function createUser(id: Identifier, input: NewUserInput): Promise<string> {
   const uid = newId("usr");
   await run(
-    "INSERT INTO users (id, role, name, email, phone, language, created_at) VALUES (?,?,?,?,?,?,?)",
+    "INSERT INTO users (id, role, name, email, phone, language, created_at, password_hash) VALUES (?,?,?,?,?,?,?,?)",
     [
       uid,
       input.role,
@@ -72,6 +84,7 @@ export async function createUser(id: Identifier, input: NewUserInput): Promise<s
       id.kind === "phone" ? id.value : null,
       input.language ?? "en",
       now(),
+      input.password ? await hashPassword(input.password) : null,
     ],
   );
   return uid;

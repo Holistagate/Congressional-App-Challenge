@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- A seeker may be signed in without ever telling us a ZIP; this is only
   -- their convenience default, and deleting it is a one-tap action.
   home_zip   TEXT REFERENCES zip_codes (zip),
+  -- Null means the account predates passwords, or was created by a seed.
+  -- Those accounts are asked to choose one the next time they sign in; see
+  -- src/app/actions/auth.ts. Never the password itself — see lib/password.ts.
+  password_hash TEXT,
   CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
 

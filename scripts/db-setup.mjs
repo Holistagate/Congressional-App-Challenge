@@ -15,6 +15,7 @@ import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { hashPassword } from "../src/lib/password.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = new Set(process.argv.slice(2));
@@ -155,16 +156,36 @@ const inMin = (m) => now + m * 60000;
 
 const seedStatements = [];
 
-const mkUser = (role, name, email, phone, lang = "en", homeZip = null) => {
+/**
+ * An admin password, if one was supplied.
+ *
+ * Without it the admin account is created with no password and the first
+ * person to sign in with that address gets to choose one — which is a race,
+ * and on a public deployment it is a race against strangers. Set it when
+ * seeding anything that is not on your own machine.
+ */
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD
+  ? await hashPassword(process.env.ADMIN_PASSWORD)
+  : null;
+
+if (!ADMIN_PASSWORD_HASH && !url.startsWith("file:")) {
+  console.warn(
+    `warning: no ADMIN_PASSWORD set. The admin account will have no password
+         and the first person to sign in as it chooses one.
+`,
+  );
+}
+
+const mkUser = (role, name, email, phone, lang = "en", homeZip = null, passwordHash = null) => {
   const uid = id("usr");
   seedStatements.push({
-    sql: "INSERT INTO users (id, role, name, email, phone, language, created_at, home_zip) VALUES (?,?,?,?,?,?,?,?)",
-    args: [uid, role, name, email, phone, lang, now, homeZip],
+    sql: "INSERT INTO users (id, role, name, email, phone, language, created_at, home_zip, password_hash) VALUES (?,?,?,?,?,?,?,?,?)",
+    args: [uid, role, name, email, phone, lang, now, homeZip, passwordHash],
   });
   return uid;
 };
 
-const adminId = mkUser("admin", "Ada Moreno", ADMIN_EMAIL, null);
+const adminId = mkUser("admin", "Ada Moreno", ADMIN_EMAIL, null, "en", null, ADMIN_PASSWORD_HASH);
 const seekerId = mkUser("seeker", "Sam Rivera", "sam@example.com", null, "en", "60615");
 mkUser("seeker", "Luz Delgado", null, "+13125550148", "es", "60616");
 

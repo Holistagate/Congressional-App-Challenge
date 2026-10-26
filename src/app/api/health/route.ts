@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { get, isRemote } from "@/db";
+import { all, get, isRemote } from "@/db";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,27 @@ export async function GET() {
     // distinguishes "schema missing" from "schema fine, logic bug".
     await get("SELECT 1 FROM users LIMIT 1");
     await get("SELECT 1 FROM sessions LIMIT 1");
+
+    // Columns added after a database was first created do not arrive on
+    // their own: schema.sql is CREATE TABLE IF NOT EXISTS, which does nothing
+    // to a table that already exists. Checked by name so the answer is "run
+    // the migration" rather than a 500 on the sign-in page.
+    const columns = await all<{ name: string }>("PRAGMA table_info(users)");
+    const missing = ["password_hash"].filter((c) => !columns.some((x) => x.name === c));
+
+    if (missing.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          problem:
+            `The users table is missing ${missing.join(", ")}. Run \`npm run migrate\` ` +
+            "with the Turso variables set. Signing in will fail until you do.",
+          ...report,
+          zipCodes: Number((await get<{ n: number }>("SELECT COUNT(*) AS n FROM zip_codes"))?.n ?? 0),
+        },
+        { status: 500 },
+      );
+    }
 
     const count = Number(zips?.n ?? 0);
 

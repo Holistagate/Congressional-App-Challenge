@@ -11,6 +11,7 @@
     "test": "node --conditions=react-server --import ./tests/hooks.mjs --test tests/*.test.ts",
     "db:setup": "node scripts/db-setup.mjs",
     "db:reset": "node scripts/db-setup.mjs --reset",
+    "migrate": "node scripts/migrate.mjs",
     "businesses": "node scripts/businesses.mjs",
     "zips": "node scripts/build-zip-table.mjs",
     "assets": "node scripts/build-assets.mjs",

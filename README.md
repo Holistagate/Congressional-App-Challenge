@@ -20,7 +20,7 @@ Open <http://localhost:3000>.
 
 ### Signing in to the demo
 
-Sign-in takes an email address and nothing else — no password, no code. See [Authentication](#authentication) for why, and what it costs.
+Sign-in takes an email address and a password. Browsing food needs no account at all — type a ZIP on `/food` and the whole seeker side works signed out.
 
 | Role | Sign in with |
 | --- | --- |
@@ -40,6 +40,18 @@ It never has to receive mail. To change it on a database that is already seeded:
 ```bash
 turso db shell <your-db> "UPDATE users SET email = 'new-address' WHERE role = 'admin'"
 ```
+
+Set `ADMIN_PASSWORD` as well when seeding anything that is not on your own machine. Without it the admin account is created with no password, and the first person to sign in with that address is the one who chooses it — a race you do not want to run against strangers.
+
+### Upgrading an existing database
+
+`schema.sql` is all `CREATE TABLE IF NOT EXISTS`, which is right for a fresh database and does nothing at all to one that already has the table — so a column added later never reaches a deployed database, and the first query that mentions it fails in production only.
+
+```bash
+TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npm run migrate
+```
+
+Safe to run twice. Run it **before** deploying a change that adds a column; `/api/health` reports a missing one by name if you forget.
 
 You don't need any of these to use the seeker side. Type a ZIP code — try **60615** — and the whole thing works signed out.
 

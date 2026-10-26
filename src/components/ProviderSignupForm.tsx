@@ -93,6 +93,26 @@ export function ProviderSignupForm({ lang }: { lang: Lang }) {
       />
 
       <Field
+        name="password"
+        type="password"
+        label={t("auth.choosePassword")}
+        hint={t("auth.passwordHint")}
+        error={err("password")}
+        required
+        minLength={8}
+        autoComplete="new-password"
+      />
+
+      <Field
+        name="confirm"
+        type="password"
+        label={t("auth.confirmPassword")}
+        error={err("confirm")}
+        required
+        autoComplete="new-password"
+      />
+
+      <Field
         name="phone"
         label={lang === "es" ? "Teléfono del negocio" : "Business phone"}
         hint={
