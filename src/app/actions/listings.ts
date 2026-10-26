@@ -7,6 +7,7 @@ import { currentUser, requireUser, requireApprovedProvider, requireOwnedListing,
 import { limit, retryMessage } from "@/lib/ratelimit";
 import { listingSchema, reportSchema, portionsUpdateSchema, fieldErrors, formList } from "@/lib/validation";
 import { zipExists } from "@/db/queries";
+import { toInstant, readOffset } from "@/lib/time";
 import { notifyMatchingSeekers, notifySavers, flushQueue } from "@/lib/notify";
 
 export type ActionState = {
@@ -36,6 +37,8 @@ export async function postListing(_prev: ActionState, data: FormData): Promise<A
   if (!gate.ok) return { error: retryMessage(gate.retryAfterSeconds) };
 
   // Times arrive as local datetime-local strings and are stored as instants.
+  const tzOffset = readOffset(data.get("tz_offset"));
+
   const parsed = listingSchema.safeParse({
     description: data.get("description"),
     categories: formList(data, "categories"),
@@ -46,8 +49,8 @@ export async function postListing(_prev: ActionState, data: FormData): Promise<A
     city: data.get("city"),
     state: data.get("state"),
     zip: data.get("zip"),
-    pickup_start: toInstant(data.get("pickup_start")),
-    pickup_end: toInstant(data.get("pickup_end")),
+    pickup_start: toInstant(data.get("pickup_start"), tzOffset),
+    pickup_end: toInstant(data.get("pickup_end"), tzOffset),
     notes: data.get("notes"),
     safety_ack: formList(data, "safety_ack"),
   });
@@ -273,7 +276,4 @@ export async function reportListing(_prev: ActionState, data: FormData): Promise
 /* ------------------------------------------------------------- helpers --- */
 
 /** `datetime-local` gives a wall-clock string; store the instant it names. */
-function toInstant(value: FormDataEntryValue | null): number {
-  const parsed = Date.parse(String(value ?? ""));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+

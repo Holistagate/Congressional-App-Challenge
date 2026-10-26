@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { postListing, type ActionState } from "@/app/actions/listings";
 import {
@@ -24,6 +24,15 @@ export function PostFoodForm({ provider, lang }: { provider: ProviderRecord; lan
   const t = translator(lang);
   const [state, action, pending] = useActionState<ActionState, FormData>(postListing, {});
   const [useBusinessAddress, setUseBusinessAddress] = useState(true);
+
+  // The server cannot know what "7:15 PM" meant. A datetime-local input sends
+  // wall-clock time with no zone attached, so parsing it server-side reads it
+  // in the server's zone — UTC on Vercel — and a Kentucky evening arrives as
+  // an afternoon that has already passed. Set after mount rather than during
+  // render, because during render this runs on the server too, where the
+  // answer would be a confident zero.
+  const [tzOffset, setTzOffset] = useState<number | null>(null);
+  useEffect(() => setTzOffset(new Date().getTimezoneOffset()), []);
 
   // Starts now, not at the next quarter hour: a kitchen posting at closing
   // has the food on the pass already, and a window that opens in nine
@@ -118,6 +127,8 @@ export function PostFoodForm({ provider, lang }: { provider: ProviderRecord; lan
             <label className="label text-sm" htmlFor="pickup_start">
               {t("post.from")}
             </label>
+            <input type="hidden" name="tz_offset" value={tzOffset ?? ""} readOnly />
+
             <input
               id="pickup_start"
               name="pickup_start"
